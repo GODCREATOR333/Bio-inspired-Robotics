@@ -47,36 +47,41 @@
 import numpy as np
 from stl import mesh
 import pyqtgraph.opengl as gl
+from PyQt5 import QtGui
+
 
 class Agent_Model:
-    def __init__(self, stl_path):
-        # --- STATIC STATE ---
+    def __init__(self, stl_path, scale=0.01):
+        """
+        :param stl_path: Path to STL file
+        :param scale: Scaling factor to shrink the model
+        :param texture_path: Optional path to a texture image
+        """
+        # --- Load STL ---
         self.raw_mesh = mesh.Mesh.from_file(stl_path)
-        self.mesh_item = self._create_glmesh()
 
-        # --- DYNAMIC STATE ---
+        # --- Center vertices around origin ---
+        self.vertices = np.array(self.raw_mesh.vectors.reshape(-1, 3), dtype=np.float32)
+        center = self.vertices.mean(axis=0)
+        self.vertices -= center  # center the mesh
+
+        # --- Faces ---
+        self.faces = np.arange(len(self.vertices)).reshape(-1, 3)
+
+        # --- Dynamic state ---
         self.position = np.array([0.0, 0.0, 0.0], dtype=float)
-        self.rotation = 0.0  # degrees, if you ever need rotation
+        self.rotation = 0.0  # degrees
 
-    # Convert STL to GLMeshItem and scale down
-    def _create_glmesh(self):
-        v = np.array(self.raw_mesh.vectors.reshape(-1, 3), dtype=np.float32)
-        f = np.arange(len(v)).reshape(-1, 3)
-
-        item = gl.GLMeshItem(
-            vertexes=v,
-            faces=f,
+        # --- Create GLMeshItem ---
+        self.mesh_item = gl.GLMeshItem(
+            vertexes=self.vertices,
+            faces=self.faces,
             smooth=False,
             drawEdges=True,
-            edgeColor=(1,1,1,1),
-            color=(0.7,0.7,0.7,1)
+            edgeColor=(0, 0, 0, 1),
+            color=(1,0.5,0.0,1),
         )
-
-        # Scale it down
-        item.scale(0.01, 0.01, 0.01)
-
-        return item
-
+        self.mesh_item.scale(scale, scale, scale)
 
     # Place it in the world
     def spawn(self, x=0, y=0, z=0):
@@ -89,6 +94,7 @@ class Agent_Model:
         self.position[1] += dy
         self.mesh_item.translate(dx, dy, 0)
 
-    # (Optional) future rotation
+    # Rotate around Z-axis
     def rotate(self, angle_deg):
-        pass  # you can fill this later
+        self.rotation += angle_deg
+        self.mesh_item.rotate(angle_deg, 0, 0, 1)  # Z-axis

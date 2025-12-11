@@ -2,7 +2,8 @@
 
 import numpy as np
 import pyqtgraph.opengl as gl
-from pyqtgraph.opengl import GLMeshItem, GLTextItem, GLLinePlotItem
+from pyqtgraph.opengl import GLMeshItem, GLTextItem, GLLinePlotItem,MeshData
+from PIL import Image, ImageDraw, ImageFont
 
 # --- Math Helper: Draw Axis Lines ---
 def axis_line(start, end, color):  #Draw each co-ordiante axis line
@@ -41,3 +42,36 @@ def create_axis_numbers(axis, length, spacing=10.0):
         label.setGLOptions('translucent') # Fix for Linux transparency issues
         numbers.append(label)
     return numbers
+
+def create_circle(radius=10, segments=64, z=0, color=(1,0,0,1)):
+    theta = np.linspace(0, 2*np.pi, segments)
+    verts = np.vstack([
+        radius * np.cos(theta),
+        radius * np.sin(theta),
+        np.full_like(theta, z)
+    ]).T
+
+    # center vertex
+    center = np.array([[0, 0, z]])
+
+    # combine vertices
+    vertices = np.vstack([center, verts])
+
+    # triangle fan faces
+    faces = []
+    for i in range(1, segments):
+        faces.append([0, i, i+1])
+    faces.append([0, segments, 1])
+
+    vertices = vertices.astype(np.float32)
+    faces = np.array(faces, dtype=np.int32)
+
+    item = gl.GLMeshItem(
+        vertexes=vertices,
+        faces=faces,
+        smooth=False,
+        drawEdges=False,
+        color=color
+    )
+
+    return item

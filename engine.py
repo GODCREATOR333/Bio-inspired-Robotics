@@ -8,6 +8,9 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from viewer import MyView
 import geometry
 from agent import Agent_Model
+from geometry import create_circle
+from food import Food_Model
+from utils import random_point_outside_radius
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -15,7 +18,11 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("Bio-Inspired Robotics")
         self.setGeometry(100, 100, 1200, 800)
 
-        self.agent = Agent_Model("CAD_Model_ant/ant_unfolded-model.stl")
+        self.agent = Agent_Model(
+            "CAD_Model_ant/ant_model.stl",
+            scale=0.01)
+        
+
         self.objects = {}
 
         # --- Layout & View ---
@@ -83,13 +90,36 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.view.addItem(z_label)
 
+
         # --- 4. Camera (top-down 2D view) ---
         self.view.setCameraPosition(distance=300, elevation=90, azimuth=0)
         self.view.opts['center'] = QtGui.QVector3D(0, 0, 0)
 
         # Add agent to scene
         self.view.addItem(self.agent.mesh_item)
-        
+        self.agent.mesh_item.translate(0, 0, 2.5)
+
+        # Add agent to scene
+        circle = create_circle(radius=20, color=(0.1, 0.7, 1.0, 0.5))
+        self.view.addItem(circle)
+
+
+        # --- Spawn dead bug food ---
+        MIN_RADIUS = 100   # forbidden zone radius
+        MAX_RADIUS = 300  # how far bugs can spawn
+
+        for i in range(5):
+            fx, fy = random_point_outside_radius(MIN_RADIUS, MAX_RADIUS)
+            
+            food = Food_Model("CAD_Model_ant/fly_model.stl", scale=8)
+
+            # apply rotation to orient correctly
+            food.mesh_item.rotate(-90, 1, 0, 0)  
+
+            food.spawn(fx, fy, 1)   # z=1 so no z-fighting
+
+            self.view.addItem(food.mesh_item)
+            self.objects[f"food_{i}"] = food
 
 
     # Dummy methods until you fill them
