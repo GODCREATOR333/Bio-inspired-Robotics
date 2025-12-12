@@ -18,62 +18,81 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("Bio-Inspired Robotics")
         self.setGeometry(100, 100, 1200, 800)
 
-        
-
-        #Create trails manager
+        # --- Trails and agent ---
         self.trails = TrailManager()
-
-
         self.agent = Agent_Model("CAD_Model_ant/ant_model.stl", scale=0.01)
         self.objects = {}
 
-        # --- Main layout ---
-        self.main_layout = QtWidgets.QHBoxLayout()  # Horizontal: view + sidebar
-        self.setLayout(self.main_layout)
+        # --- Outer horizontal splitter: sidebar | main content ---
+        self.outer_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.outer_splitter.setHandleWidth(6)
 
-        # --- Instructions sidebar ---
+        # Sidebar
         self.instruction_widget = QtWidgets.QWidget()
         self.instruction_layout = QtWidgets.QVBoxLayout()
         self.instruction_widget.setLayout(self.instruction_layout)
-
-        # Fixed width sidebar
-        self.instruction_widget.setFixedWidth(250)
-
         self.instructions_text = QtWidgets.QTextEdit()
         self.instructions_text.setReadOnly(True)
-        self.instructions_text.setPlainText(
-            "Instructions:\n"
-            "- Use arrow keys to move the ant.\n"
-            "- Press R to reset camera and ant.\n"
-            "- Use I/O to zoom in/out.\n"
-            "- Use W/A/S/D to pan camera.\n"
-
-            "-------------------------------\n"
-            "-------------------------------\n"
-
-            "--- Reference / Constants ---\n"
-            "- Home detection range: 20 mm\n"
-            "- Ant detection range: 10 mm\n"
-            "- Dead bug detection range: 10 mm\n"
-            "- Sun position: purely visual; actual computation in get_sun_azimuth()"
-            
-        )
-
+        self.instructions_text.setPlainText("Instructions:\n- Use arrow keys to move the ant.\n- Press R to reset.\n- Zoom: I/O, Pan: W/A/S/D\n")
         self.instruction_layout.addWidget(self.instructions_text)
-        self.main_layout.addWidget(self.instruction_widget, 1)  # stretch factor 1
+        self.outer_splitter.addWidget(self.instruction_widget)
+        self.instruction_widget.setMinimumWidth(150)
 
+        # --- Right side: vertical splitter (3D view | bottom plots) ---
+        self.right_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.right_splitter.setHandleWidth(6)
 
-        # --- 3D view ---
+        # 3D view (top)
         self.view = MyView()
-        self.view.main = self  # allow view to call movement
-        self.main_layout.addWidget(self.view, 3)  # stretch factor 3 (takes most space)
-        # --- Setup scene and timer ---
+        self.view.main = self
+        self.right_splitter.addWidget(self.view)
+        self.view.setMinimumHeight(200)
+
+        # Bottom plots: horizontal splitter (XY | Error)
+        self.bottom_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.bottom_splitter.setHandleWidth(5)
+
+        # Left plot: XY positions
+        self.xy_plot = pg.PlotWidget()
+        self.xy_plot.showGrid(x=True, y=True)
+        self.xy_plot.setLabel('left', 'Y Position')
+        self.xy_plot.setLabel('bottom', 'X Position')
+        self.true_curve = self.xy_plot.plot(pen=pg.mkPen(color=(0, 180, 0), width=2))
+        self.sim_curve  = self.xy_plot.plot(pen=pg.mkPen(color=(180, 0, 180), width=2))
+        self.bottom_splitter.addWidget(self.xy_plot)
+
+        # Right plot: error
+        self.error_plot = pg.PlotWidget()
+        self.error_plot.showGrid(x=True, y=True)
+        self.error_plot.setLabel('left', 'Error')
+        self.error_plot.setLabel('bottom', 'Step')
+        self.error_curve = self.error_plot.plot(pen=pg.mkPen(color=(200, 50, 50), width=2))
+        self.bottom_splitter.addWidget(self.error_plot)
+
+        # Add bottom splitter to vertical splitter
+        self.right_splitter.addWidget(self.bottom_splitter)
+        self.bottom_splitter.setSizes([600, 400])
+
+        # Add right splitter to outer splitter
+        self.outer_splitter.addWidget(self.right_splitter)
+
+        # Set initial splitter sizes
+        self.outer_splitter.setSizes([250, 950])  # Sidebar vs rest
+        self.right_splitter.setSizes([600, 200])  # 3D view vs bottom
+
+        # Set layout
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self.outer_splitter)
+        self.setLayout(layout)
+
+        # --- Timer for live updates ---
         self.setup_scene()
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self._animate_step)
-        self.update_transforms()
+        self.timer.start(30)  # ~30ms/frame
 
 
+        
     def setup_scene(self):
         """Creates a 2D canvas on the XY plane."""
 
@@ -198,7 +217,23 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def _animate_step(self):
-        pass
+        # Update XY plot
+        if len(self.trails.true_trail_data) > 0:
+            self.true_curve.setData(
+                self.trails.true_trail_data[:, 0],
+                self.trails.true_trail_data[:, 1]
+            )
+            self.sim_curve.setData(
+                self.trails.sim_trail_data[:, 0],
+                self.trails.sim_trail_data[:, 1]
+            )
+
+        # Compute error (distance between true and sim positions)
+        errors = np.linalg.norm(
+            self.trails.true_trail_data[:, :2] - self.trails.sim_trail_data[:, :2],
+            axis=1
+        ) if len(self.trails.true_trail_data) > 0 else np.array([])
+        self.error_curve.setData(errors)
 
 
     def update_transforms(self):

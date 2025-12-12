@@ -122,17 +122,10 @@ class MyView(gl.GLViewWidget):
 
         # If the ant moved, update trails
         if moved:
-            drift_sigma =1 
-            bias_x=1
-            bias_y=1
             px, py, pz = self.main.agent.position
 
-            true_pos = np.array([px, py, pz], dtype=float)
-
-            dx = np.random.normal(0, drift_sigma) + bias_x
-            dy = np.random.normal(0, drift_sigma) + bias_y
-
-            sim_pos = true_pos + np.array([dx, dy, 0.0])
+            true_pos = self.main.agent.get_true_pos()   # (x,y,z)
+            sim_pos  = self.main.agent.get_sim_pos()    # (x,y,z)
 
             # Push to trail manager
             self.main.trails.update(true_pos, sim_pos)
