@@ -8,7 +8,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from viewer import MyView
 import geometry
 from agent import Agent_Model
-from geometry import create_circle
+from geometry import create_circle,create_sun
 from food import Food_Model
 from utils import random_point_outside_radius
 
@@ -45,7 +45,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # --- 1. Single XY Plane Grid ---
         grid = gl.GLGridItem()
-        grid.setSize(x=500, y=500)
+        grid.setSize(x=1500, y=1500)
         grid.setSpacing(x=10, y=10)
         # No rotation -> stays in XY plane
         self.view.addItem(grid)
@@ -62,6 +62,17 @@ class MainWindow(QtWidgets.QWidget):
         self.view.addItem(geometry.axis_line(
             [0, 0, 0], [0, axis_len, 0], (0, 1, 0, 1)
         ))
+
+        # -X axis (red, lighter shade optional)
+        self.view.addItem(geometry.axis_line(
+            [0, 0, 0], [-axis_len, 0, 0], (1, 0.4, 0.4, 1)
+        ))
+
+        # -Y axis (green, lighter shade optional)
+        self.view.addItem(geometry.axis_line(
+            [0, 0, 0], [0, -axis_len, 0], (0.4, 1, 0.4, 1)
+        ))
+
 
         # Optional Z axis
         self.view.addItem(geometry.axis_line(
@@ -91,6 +102,22 @@ class MainWindow(QtWidgets.QWidget):
         self.view.addItem(z_label)
 
 
+        neg_x_label = GLTextItem(
+            pos=[-axis_len - 5, 0, 0],
+            text="-X",
+            color=(255, 100, 100, 255)
+        )
+        self.view.addItem(neg_x_label)
+
+        neg_y_label = GLTextItem(
+            pos=[0, -axis_len - 5, 0],
+            text="-Y",
+            color=(100, 255, 100, 255)
+        )
+        self.view.addItem(neg_y_label)
+
+
+
         # --- 4. Camera (top-down 2D view) ---
         self.view.setCameraPosition(distance=300, elevation=90, azimuth=0)
         self.view.opts['center'] = QtGui.QVector3D(0, 0, 0)
@@ -99,16 +126,21 @@ class MainWindow(QtWidgets.QWidget):
         self.view.addItem(self.agent.mesh_item)
         self.agent.mesh_item.translate(0, 0, 2.5)
 
-        # Add agent to scene
-        circle = create_circle(radius=20, color=(0.1, 0.7, 1.0, 0.5))
+        # Add detection radius to Home
+        circle = create_circle(radius=20,x=0,y=0,z=0, color=(0.1, 0.7, 1.0, 0.5))
         self.view.addItem(circle)
+
+        # Place the sun high above the world for visibility
+        sun_items = create_sun(x=200, y=200, z=200, radius=10, ray_length=40)
+
+        for item in sun_items:
+            self.view.addItem(item)
 
 
         # --- Spawn dead bug food ---
-        MIN_RADIUS = 100   # forbidden zone radius
-        MAX_RADIUS = 300  # how far bugs can spawn
-
-        for i in range(5):
+        MIN_RADIUS = 200   # forbidden zone radius
+        MAX_RADIUS = 400  # how far bugs can spawn
+        for i in range(15):
             fx, fy = random_point_outside_radius(MIN_RADIUS, MAX_RADIUS)
             
             food = Food_Model("CAD_Model_ant/fly_model.stl", scale=8)
@@ -116,9 +148,12 @@ class MainWindow(QtWidgets.QWidget):
             # apply rotation to orient correctly
             food.mesh_item.rotate(-90, 1, 0, 0)  
 
-            food.spawn(fx, fy, 1)   # z=1 so no z-fighting
+            food.spawn(fx, fy, 1) #Z=1,spawn above x,y plane
+            circle_dead_bug=create_circle(radius=10,x=fx,y=fy,z=0,color=(0,0.5,1,0.8)) #radius = detection radius
+            
 
             self.view.addItem(food.mesh_item)
+            self.view.addItem(circle_dead_bug)
             self.objects[f"food_{i}"] = food
 
 

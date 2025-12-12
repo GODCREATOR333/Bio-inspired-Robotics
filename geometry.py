@@ -26,36 +26,22 @@ def create_axis_ticks(axis, length, spacing=10.0, tick_size=2.0):
         ticks.append(GLLinePlotItem(pos=np.array([start, end]), color=(1,1,1,0.5), width=1))
     return ticks
 
-def create_axis_numbers(axis, length, spacing=10.0):
-    # Draws the numbers (10, 20, 30...)
-    numbers = []
-    positions = np.arange(spacing, length + spacing, spacing)
-    for pos in positions:
-        text = f'{pos:.0f}'
-        # Position the text slightly offset from the axis
-        if axis == 'x': position = [pos, -5, 0]
-        elif axis == 'y': position = [-5, pos, 0]
-        elif axis == 'z': position = [-5, 0, pos]
-        
-        label = GLTextItem(text=text, color=(255, 255, 255, 255)) # White text
-        label.setData(pos=np.array(position))
-        label.setGLOptions('translucent') # Fix for Linux transparency issues
-        numbers.append(label)
-    return numbers
-
-def create_circle(radius=10, segments=64, z=0, color=(1,0,0,1)):
+## This circle is considered as detection radius
+def create_circle(radius=10, segments=64, x=0, y=0, z=0, color=(1,0,0,1)):
     theta = np.linspace(0, 2*np.pi, segments)
+
+    # base circle around origin
     verts = np.vstack([
-        radius * np.cos(theta),
-        radius * np.sin(theta),
+        radius * np.cos(theta) + x,
+        radius * np.sin(theta) + y,
         np.full_like(theta, z)
     ]).T
 
-    # center vertex
-    center = np.array([[0, 0, z]])
+    # center vertex shifted to (x, y, z)
+    center = np.array([[x, y, z]], dtype=np.float32)
 
     # combine vertices
-    vertices = np.vstack([center, verts])
+    vertices = np.vstack([center, verts]).astype(np.float32)
 
     # triangle fan faces
     faces = []
@@ -63,7 +49,6 @@ def create_circle(radius=10, segments=64, z=0, color=(1,0,0,1)):
         faces.append([0, i, i+1])
     faces.append([0, segments, 1])
 
-    vertices = vertices.astype(np.float32)
     faces = np.array(faces, dtype=np.int32)
 
     item = gl.GLMeshItem(
@@ -75,3 +60,42 @@ def create_circle(radius=10, segments=64, z=0, color=(1,0,0,1)):
     )
 
     return item
+
+
+
+def create_sun(x=0, y=0, z=100, radius=8, ray_length=20, color=(1, 1, 0, 1)):
+    """
+    Create a sun-like global reference: a sphere + radial rays.
+    """
+
+    # --- Sphere (sun core) ---
+    sphere = gl.GLMeshItem(
+        meshdata=gl.MeshData.sphere(rows=16, cols=32, radius=radius),
+        smooth=True,
+        color=color,
+        shader='shaded',
+        glOptions='opaque'
+    )
+    sphere.translate(x, y, z)
+
+    # --- Rays ---
+    rays = []
+    directions = [
+        (1, 0, 0), (-1, 0, 0),   # +X, -X
+        (0, 1, 0), (0, -1, 0),   # +Y, -Y
+        (0, 0, 1), (0, 0, -1),   # +Z, -Z
+    ]
+
+    for dx, dy, dz in directions:
+        ray = gl.GLLinePlotItem(
+            pos=np.array([
+                [x, y, z],
+                [x + dx * ray_length, y + dy * ray_length, z + dz * ray_length]
+            ], dtype=float),
+            color=color,
+            width=2,
+            antialias=True
+        )
+        rays.append(ray)
+
+    return [sphere] + rays

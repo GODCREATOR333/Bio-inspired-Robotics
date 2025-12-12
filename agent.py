@@ -57,6 +57,10 @@ class Agent_Model:
         :param scale: Scaling factor to shrink the model
         :param texture_path: Optional path to a texture image
         """
+
+        #Store scale factor
+        self.scale_factor = scale
+
         # --- Load STL ---
         self.raw_mesh = mesh.Mesh.from_file(stl_path)
 
@@ -83,10 +87,17 @@ class Agent_Model:
         )
         self.mesh_item.scale(scale, scale, scale)
 
-    # Place it in the world
+    # Place it in the world    
     def spawn(self, x=0, y=0, z=0):
+        # Reset any previous transforms
+        self.mesh_item.resetTransform()
+        # Reapply scale
+        self.mesh_item.scale(self.scale_factor, self.scale_factor, self.scale_factor)
+        # Move to new position
         self.position[:] = (x, y, z)
         self.mesh_item.translate(x, y, z)
+        
+
 
     # Move in XY plane
     def move(self, dx, dy):
