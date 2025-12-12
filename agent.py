@@ -48,6 +48,8 @@ import numpy as np
 from stl import mesh
 import pyqtgraph.opengl as gl
 from PyQt5 import QtGui
+from geometry import create_circle
+from viewer import MyView
 
 
 class Agent_Model:
@@ -60,6 +62,7 @@ class Agent_Model:
 
         #Store scale factor
         self.scale_factor = scale
+        self.detection_circle = None
 
         # --- Load STL ---
         self.raw_mesh = mesh.Mesh.from_file(stl_path)
@@ -88,15 +91,22 @@ class Agent_Model:
         self.mesh_item.scale(scale, scale, scale)
 
     # Place it in the world    
-    def spawn(self, x=0, y=0, z=0):
-        # Reset any previous transforms
+    def spawn(self, x=0, y=0, z=0, view=None):
+        # Reset ant transform
         self.mesh_item.resetTransform()
-        # Reapply scale
         self.mesh_item.scale(self.scale_factor, self.scale_factor, self.scale_factor)
-        # Move to new position
         self.position[:] = (x, y, z)
         self.mesh_item.translate(x, y, z)
-        
+
+        # Move circle if exists
+        if self.detection_circle is not None:
+            self.detection_circle.resetTransform()
+            self.detection_circle.translate(x, y, 0)
+
+        # Create circle only once if view is provided
+        elif view is not None:
+            self.detection_circle = create_circle(radius=10, x=x, y=y, z=0, color=(0.8,0.3,0.3,0.3))
+            view.addItem(self.detection_circle)
 
 
     # Move in XY plane
@@ -104,6 +114,9 @@ class Agent_Model:
         self.position[0] += dx
         self.position[1] += dy
         self.mesh_item.translate(dx, dy, 0)
+        if self.detection_circle is not None:
+            self.detection_circle.translate(dx, dy, 0)
+
 
     # Rotate around Z-axis
     def rotate(self, angle_deg):

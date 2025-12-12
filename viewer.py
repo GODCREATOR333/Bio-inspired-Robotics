@@ -1,11 +1,14 @@
 import pyqtgraph.opengl as gl
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QTimer
+from utils import TrailManager
+import numpy as np
 
 
 class MyView(gl.GLViewWidget):
     def __init__(self):
         super().__init__()
+
 
         self.zoomFactor = 0.9
         self.currentDist = 300
@@ -57,25 +60,25 @@ class MyView(gl.GLViewWidget):
             return
 
         # --- PAN ---
-        if key == Qt.Key_W:
+        if key == Qt.Key_A:
             c.setX(c.x() - self.panStep)
             self.opts['center'] = c
             self.update()
             return
 
-        if key == Qt.Key_S:
+        if key == Qt.Key_D:
             c.setX(c.x() + self.panStep)
             self.opts['center'] = c
             self.update()
             return
 
-        if key == Qt.Key_A:
+        if key == Qt.Key_S:
             c.setY(c.y() - self.panStep)
             self.opts['center'] = c
             self.update()
             return
 
-        if key == Qt.Key_D:
+        if key == Qt.Key_W:
             c.setY(c.y() + self.panStep)
             self.opts['center'] = c
             self.update()
@@ -92,21 +95,47 @@ class MyView(gl.GLViewWidget):
             self.update()
 
             # Reset agent position and scale
-            self.main.agent.spawn(0, 0, 2.5)
+            self.main.agent.spawn(0, 0, 2.5, view=self.main.view)
+
+            # Reset trail
+            self.main.trails.reset()
             return
 
         # --- AGENT MOVEMENT (Arrow Keys) ---
+        moved = False
+
         if key == Qt.Key_Up:
             self.main.agent.move(0, +5)
+            moved = True
         elif key == Qt.Key_Down:
             self.main.agent.move(0, -5)
+            moved = True
         elif key == Qt.Key_Left:
             self.main.agent.move(-5, 0)
+            moved = True
         elif key == Qt.Key_Right:
             self.main.agent.move(+5, 0)
+            moved = True
         else:
             super().keyPressEvent(ev)
             return
 
-        px, py, pz = self.main.agent.position
-        self.follow(px, py, pz)
+        # If the ant moved, update trails
+        if moved:
+            drift_sigma =1 
+            bias_x=1
+            bias_y=1
+            px, py, pz = self.main.agent.position
+
+            true_pos = np.array([px, py, pz], dtype=float)
+
+            dx = np.random.normal(0, drift_sigma) + bias_x
+            dy = np.random.normal(0, drift_sigma) + bias_y
+
+            sim_pos = true_pos + np.array([dx, dy, 0.0])
+
+            # Push to trail manager
+            self.main.trails.update(true_pos, sim_pos)
+
+            # Update camera or whatever
+            self.follow(px, py, pz)

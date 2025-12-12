@@ -10,7 +10,7 @@ import geometry
 from agent import Agent_Model
 from geometry import create_circle,create_sun
 from food import Food_Model
-from utils import random_point_outside_radius
+from utils import random_point_outside_radius,TrailManager
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -18,27 +18,61 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("Bio-Inspired Robotics")
         self.setGeometry(100, 100, 1200, 800)
 
-        self.agent = Agent_Model(
-            "CAD_Model_ant/ant_model.stl",
-            scale=0.01)
         
 
+        #Create trails manager
+        self.trails = TrailManager()
+
+
+        self.agent = Agent_Model("CAD_Model_ant/ant_model.stl", scale=0.01)
         self.objects = {}
 
-        # --- Layout & View ---
+        # --- Main layout ---
+        self.main_layout = QtWidgets.QHBoxLayout()  # Horizontal: view + sidebar
+        self.setLayout(self.main_layout)
+
+        # --- Instructions sidebar ---
+        self.instruction_widget = QtWidgets.QWidget()
+        self.instruction_layout = QtWidgets.QVBoxLayout()
+        self.instruction_widget.setLayout(self.instruction_layout)
+
+        # Fixed width sidebar
+        self.instruction_widget.setFixedWidth(250)
+
+        self.instructions_text = QtWidgets.QTextEdit()
+        self.instructions_text.setReadOnly(True)
+        self.instructions_text.setPlainText(
+            "Instructions:\n"
+            "- Use arrow keys to move the ant.\n"
+            "- Press R to reset camera and ant.\n"
+            "- Use I/O to zoom in/out.\n"
+            "- Use W/A/S/D to pan camera.\n"
+
+            "-------------------------------\n"
+            "-------------------------------\n"
+
+            "--- Reference / Constants ---\n"
+            "- Home detection range: 20 mm\n"
+            "- Ant detection range: 10 mm\n"
+            "- Dead bug detection range: 10 mm\n"
+            "- Sun position: purely visual; actual computation in get_sun_azimuth()"
+            
+        )
+
+        self.instruction_layout.addWidget(self.instructions_text)
+        self.main_layout.addWidget(self.instruction_widget, 1)  # stretch factor 1
+
+
+        # --- 3D view ---
         self.view = MyView()
         self.view.main = self  # allow view to call movement
-
-        self.main_layout = QtWidgets.QHBoxLayout()
-        self.setLayout(self.main_layout)
-        self.main_layout.addWidget(self.view, 1)
-
+        self.main_layout.addWidget(self.view, 3)  # stretch factor 3 (takes most space)
+        # --- Setup scene and timer ---
         self.setup_scene()
-
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self._animate_step)
-
         self.update_transforms()
+
 
     def setup_scene(self):
         """Creates a 2D canvas on the XY plane."""
@@ -122,9 +156,10 @@ class MainWindow(QtWidgets.QWidget):
         self.view.setCameraPosition(distance=300, elevation=90, azimuth=0)
         self.view.opts['center'] = QtGui.QVector3D(0, 0, 0)
 
-        # Add agent to scene
+        # Add agent(Ant) to scene
+        self.agent.spawn(0, 0, 2.5, view=self.view)
         self.view.addItem(self.agent.mesh_item)
-        self.agent.mesh_item.translate(0, 0, 2.5)
+        
 
         # Add detection radius to Home
         circle = create_circle(radius=20,x=0,y=0,z=0, color=(0.1, 0.7, 1.0, 0.5))
@@ -157,9 +192,14 @@ class MainWindow(QtWidgets.QWidget):
             self.objects[f"food_{i}"] = food
 
 
-    # Dummy methods until you fill them
+        # Add the true trail to the scene (only true trail rendered)
+        self.view.addItem(self.trails.true_trail)
+        self.view.addItem(self.trails.sim_trail)
+
+
     def _animate_step(self):
         pass
+
 
     def update_transforms(self):
         pass
