@@ -97,9 +97,12 @@ class Agent_Model:
         self.reset_drift()
         self.perceived_position = np.array([x + self.bias[0], y + self.bias[1], z], dtype=float)
 
-        # Optionally create detection circle if you do that here (unchanged)
-        if view is not None and self.detection_circle is None:
-            # create_circle must be imported/available in the calling code
+        if self.detection_circle is not None:
+            self.detection_circle.resetTransform()
+            self.detection_circle.translate(x, y, 0)
+
+        # Create circle only once if view is provided
+        elif view is not None:
             self.detection_circle = create_circle(radius=10, x=x, y=y, z=0, color=(1,0,0,0.3))
             view.addItem(self.detection_circle)
 
