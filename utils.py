@@ -18,9 +18,9 @@ class TrailManager:
     Manages two trails: true trail (real ant position) and simulated trail (ant's perceived path)
     """
     def __init__(self):
-        # Start with 0,0,0
-        self.true_trail_data = np.array([[0.0, 0.0, 0.0]], dtype=float)
-        self.sim_trail_data = np.array([[0.0, 0.0, 0.0]], dtype=float)
+        # Start with empty data 
+        self.true_trail_data = np.zeros((0, 3), dtype=float)
+        self.sim_trail_data  = np.zeros((0, 3), dtype=float)
 
         # Create GLScatterPlotItems
         self.true_trail = GLScatterPlotItem(

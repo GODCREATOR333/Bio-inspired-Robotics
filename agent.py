@@ -5,6 +5,14 @@ from PyQt5 import QtGui
 from geometry import create_circle
 
 
+# What is there in this file ?
+# This file is supposed to be only concerned with the tunable parameters to experiment with .
+# Noise parameters
+# Geometry
+# State/position of the agent/ant
+
+
+
 class Agent_Model:
     def __init__(self, stl_path, scale=0.01,
                  bias_mean=1.95, bias_std=2.1,
@@ -16,6 +24,7 @@ class Agent_Model:
         :param bias_std:  std of Gaussian bias (applied to x,y)
         :param drift_std: std of Gaussian *incremental* drift per move (random walk)
         """
+
         # --- Noise params ---
         self.bias_mean = bias_mean
         self.bias_std = bias_std
@@ -42,6 +51,7 @@ class Agent_Model:
 
         # --- Dynamic (true) state ---
         self.position = np.array([0.0, 0.0, 0.0], dtype=float)  # true world position
+        self.perceived_position = self.position.copy() #Perceived Position of the ant
         self.rotation = 0.0  # degrees
 
         # --- Perceived (noisy) state ---
@@ -138,3 +148,4 @@ class Agent_Model:
 
     def get_sim_pos(self):
         return self.perceived_position.copy()
+    

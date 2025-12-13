@@ -12,6 +12,12 @@ from geometry import create_circle,create_sun
 from food import Food_Model
 from utils import random_point_outside_radius,TrailManager
 
+
+from fsm_controller import FSMController, AgentState
+from correlated_random_walk import CorrelatedRandomWalk
+from homing_policy import VectorHoming
+
+
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -23,6 +29,31 @@ class MainWindow(QtWidgets.QWidget):
         self.agent = Agent_Model("CAD_Model_ant/ant_model.stl", scale=0.01)
         self.objects = {}
 
+
+        # Has Simulation started ?
+        self.simulation_active = False
+
+
+        # --- Navigation policies ---
+        self.search_policy = CorrelatedRandomWalk(
+            step_length=2.0,
+            turn_std=np.deg2rad(15)
+        )
+
+        self.homing_policy = VectorHoming(
+            step_length=2.0,
+            home_threshold=5.0
+        )
+
+        # --- FSM ---
+        self.fsm = FSMController(
+            agent=self.agent,
+            search_policy=self.search_policy,
+            homing_policy=self.homing_policy
+        )
+
+
+        # UI code below -----
         # --- Outer horizontal splitter: sidebar | main content ---
         self.outer_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.outer_splitter.setHandleWidth(6)
@@ -31,12 +62,49 @@ class MainWindow(QtWidgets.QWidget):
         self.instruction_widget = QtWidgets.QWidget()
         self.instruction_layout = QtWidgets.QVBoxLayout()
         self.instruction_widget.setLayout(self.instruction_layout)
+
         self.instructions_text = QtWidgets.QTextEdit()
         self.instructions_text.setReadOnly(True)
-        self.instructions_text.setPlainText("Instructions:\n- Use arrow keys to move the ant.\n- Press R to reset.\n- Zoom: I/O, Pan: W/A/S/D\n")
+        self.instructions_text.setPlainText(
+            "Instructions:\n"
+            "- Use arrow keys to move the ant.\n"
+            "- Press R to reset camera and ant.\n"
+            "- Use I/O to zoom in/out.\n"
+            "- Use W/A/S/D to pan camera.\n"
+            "-------------------------------\n"
+            "--- Reference / Constants ---\n"
+            "- Home detection range: 20 mm\n"
+            "- Ant detection range: 10 mm\n"
+            "- Dead bug detection range: 10 mm\n"
+            "- Sun position: purely visual; actual computation in get_sun_azimuth()"
+        )
+        self.instructions_text.setMaximumHeight(550)
+
         self.instruction_layout.addWidget(self.instructions_text)
+
+        self.start_button = QtWidgets.QPushButton("Start Search")
+        self.pause_button = QtWidgets.QPushButton("Pause Search")
+        self.stop_button = QtWidgets.QPushButton("Stop Search")
+
+        self.instruction_layout.addWidget(self.start_button)
+        self.instruction_layout.addWidget(self.pause_button)
+        self.instruction_layout.addWidget(self.stop_button)
+
+        # Connect buttons
+        self.start_button.clicked.connect(self.start_search)
+        self.pause_button.clicked.connect(self.toggle_pause)
+        self.stop_button.clicked.connect(self.stop_search)
+
+        # Init the buttons 
+        self.start_button.setEnabled(True)
+        self.pause_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+
+        self.instruction_layout.addStretch(1)
+
         self.outer_splitter.addWidget(self.instruction_widget)
         self.instruction_widget.setMinimumWidth(150)
+
 
         # --- Right side: vertical splitter (3D view | bottom plots) ---
         self.right_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
@@ -77,8 +145,8 @@ class MainWindow(QtWidgets.QWidget):
         self.outer_splitter.addWidget(self.right_splitter)
 
         # Set initial splitter sizes
-        self.outer_splitter.setSizes([250, 950])  # Sidebar vs rest
-        self.right_splitter.setSizes([600, 200])  # 3D view vs bottom
+        self.outer_splitter.setSizes([100, 950])  # Sidebar vs rest
+        self.right_splitter.setSizes([500, 300])  # 3D view vs bottom
 
         # Set layout
         layout = QtWidgets.QHBoxLayout()
@@ -88,7 +156,7 @@ class MainWindow(QtWidgets.QWidget):
         # --- Timer for live updates ---
         self.setup_scene()
         self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self._animate_step)
+        self.timer.timeout.connect(self.simulation_step)
         self.timer.start(30)  # ~30ms/frame
 
 
@@ -236,5 +304,57 @@ class MainWindow(QtWidgets.QWidget):
         self.error_curve.setData(errors)
 
 
+    def simulation_step(self):
+        if not self.simulation_active:
+            return
+        else:
+            #1
+            self.fsm.update()
+            
+            # 2. Only log trails if agent moved
+        if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
+            true_pos = self.agent.get_true_pos()
+            sim_pos = self.agent.get_sim_pos()
+            self.trails.update(true_pos, sim_pos)
+            
+            #4
+            self._animate_step()
+            
+
+            # Update Camera Position to follow the ant
+            px, py, pz = self.agent.position
+            self.view.follow(px, py, pz)
+
+
     def update_transforms(self):
         pass
+    
+    def start_search(self):
+        # Reset ant & trails if coming from STOP
+        self.agent.spawn(0, 0, 2.5, view=self.view)
+        self.trails.reset()
+        self.fsm.set_state(AgentState.SEARCH)
+        self.pause_button.setText("Pause")
+        self.start_button.setEnabled(False)
+        self.pause_button.setEnabled(True)
+        self.stop_button.setEnabled(True)
+        self.simulation_active = True
+
+    def toggle_pause(self):
+        if self.fsm.state == AgentState.SEARCH:
+            # Currently searching → pause
+            self.fsm.set_state(AgentState.IDLE)
+            self.pause_button.setText("Resume Search")
+        elif self.fsm.state == AgentState.IDLE:
+            # Currently paused → resume
+            self.fsm.set_state(AgentState.SEARCH)
+            self.pause_button.setText("Pause Search")
+
+    def stop_search(self):
+        if self.fsm.state != AgentState.STOP:
+            self.fsm.set_state(AgentState.STOP)
+            #self.export_simulation_data()
+            # Disable buttons
+            self.stop_button.setEnabled(False)
+            self.pause_button.setEnabled(False)
+            self.start_button.setEnabled(True)
