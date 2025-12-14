@@ -11,10 +11,10 @@ class AgentConfig:
     agent_speed: float = 3.0
 
     heading_bias_mean: float = 0.0            # rad
-    heading_bias_std: float = np.deg2rad(5.0) # rad (initial compass offset)
+    heading_bias_std: float = np.deg2rad(0.05) # rad (initial compass offset)
 
-    heading_noise_std: float = np.deg2rad(5.5) # rad per step
-    stride_noise_std: float = 0.05             # fraction
+    heading_noise_std: float = np.deg2rad(0.5) # rad per step
+    stride_noise_std: float = 0.02             # fraction
 
 @dataclass
 class CRWConfig:

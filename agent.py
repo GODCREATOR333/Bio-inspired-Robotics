@@ -131,7 +131,14 @@ class Agent_Model:
         stride_scale = np.random.normal(1.0, self.stride_noise_std)
         step_dist_est = step_dist * stride_scale
 
-        perceived_heading = step_angle + self.heading_bias + self.heading_est
+        # Accumulate the error (History)
+        self.heading_est += self.heading_bias + heading_noise 
+
+        # Apply history to current step
+        perceived_heading = step_angle + self.heading_est
+        
+        # Old Method 
+        #perceived_heading = step_angle + self.heading_bias + self.heading_est
 
         self.perceived_position[0] += step_dist_est * np.cos(perceived_heading)
         self.perceived_position[1] += step_dist_est * np.sin(perceived_heading)
