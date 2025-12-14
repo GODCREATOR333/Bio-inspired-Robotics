@@ -11,6 +11,7 @@ from agent import Agent_Model
 from geometry import create_circle,create_sun
 from food import Food_Model
 from utils import random_point_outside_radius,TrailManager
+from config import AgentConfig,CRWConfig,HomingConfig,EnvironmentConfig
 
 
 from fsm_controller import FSMController, AgentState
@@ -24,9 +25,16 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("Bio-Inspired Robotics")
         self.setGeometry(100, 100, 1200, 800)
 
+        # --Load Configs--
+        self.agent_cfg = AgentConfig()
+        self.crw_cfg = CRWConfig()
+        self.homing_cfg = HomingConfig()
+        self.env_cfg=EnvironmentConfig()
+
+
         # --- Trails and agent ---
         self.trails = TrailManager()
-        self.agent = Agent_Model("CAD_Model_ant/ant_model.stl", scale=0.01)
+        self.agent = Agent_Model("CAD_Model_ant/ant_model.stl",agent_cfg=self.agent_cfg, scale=0.01)
         self.objects = {}
 
 
@@ -36,12 +44,12 @@ class MainWindow(QtWidgets.QWidget):
 
         # --- Navigation policies ---
         self.search_policy = CorrelatedRandomWalk(
-            step_length=2.0,
+            step_length=self.agent.agent_speed,
             turn_std=np.deg2rad(15)
         )
 
         self.homing_policy = VectorHoming(
-            step_length=2.0,
+            step_length=self.agent.agent_speed,
             home_threshold=5.0
         )
 
@@ -53,21 +61,22 @@ class MainWindow(QtWidgets.QWidget):
         )
 
 
-        # UI code below -----
-        # --- Outer horizontal splitter: sidebar | main content ---
+        # --- Sidebar UI Setup ---
         self.outer_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.outer_splitter.setHandleWidth(6)
 
-        # Sidebar
+        # Sidebar container
         self.instruction_widget = QtWidgets.QWidget()
         self.instruction_layout = QtWidgets.QVBoxLayout()
         self.instruction_widget.setLayout(self.instruction_layout)
+        self.outer_splitter.addWidget(self.instruction_widget)
+        self.instruction_widget.setMinimumWidth(180)
 
+        # Instructions
         self.instructions_text = QtWidgets.QTextEdit()
         self.instructions_text.setReadOnly(True)
         self.instructions_text.setPlainText(
             "Instructions:\n"
-            "- Use arrow keys to move the ant.\n"
             "- Press R to reset camera and ant.\n"
             "- Use I/O to zoom in/out.\n"
             "- Use W/A/S/D to pan camera.\n"
@@ -76,16 +85,101 @@ class MainWindow(QtWidgets.QWidget):
             "- Home detection range: 20 mm\n"
             "- Ant detection range: 10 mm\n"
             "- Dead bug detection range: 10 mm\n"
-            "- Sun position: purely visual; actual computation in get_sun_azimuth()"
+            "- Sun position: visual only"
         )
-        self.instructions_text.setMaximumHeight(550)
-
+        self.instructions_text.setMaximumHeight(200)
         self.instruction_layout.addWidget(self.instructions_text)
 
+        # --- Agent Parameters ---
+        self.param_group = QtWidgets.QGroupBox("Agent Parameters")
+        self.param_layout = QtWidgets.QFormLayout()
+        self.param_group.setLayout(self.param_layout)
+
+        self.bias_mean_input = QtWidgets.QDoubleSpinBox()
+        self.bias_mean_input.setRange(-5.0, 5.0)
+        self.bias_mean_input.setSingleStep(0.1)
+        self.bias_mean_input.setValue(self.agent_cfg.bias_mean)
+
+        self.bias_std_input = QtWidgets.QDoubleSpinBox()
+        self.bias_std_input.setRange(0.0, 5.0)
+        self.bias_std_input.setSingleStep(0.1)
+        self.bias_std_input.setValue(self.agent_cfg.bias_std)
+
+        self.drift_std_input = QtWidgets.QDoubleSpinBox()
+        self.drift_std_input.setRange(0.0, 5.0)
+        self.drift_std_input.setSingleStep(0.1)
+        self.drift_std_input.setValue(self.agent_cfg.drift_std)
+
+        self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.speed_slider.setRange(1, 100)
+        self.speed_slider.setValue(int(self.agent_cfg.agent_speed))
+        self.speed_label = QtWidgets.QLabel(f"{self.agent_cfg.agent_speed:.1f}")
+        self.speed_slider.valueChanged.connect(
+            lambda v: self.speed_label.setText(f"{v:.1f}")
+        )
+
+        self.turn_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.turn_slider.setRange(0, 90)
+        self.turn_slider.setValue(int(np.rad2deg(self.crw_cfg.turn_std)))
+        self.turn_label = QtWidgets.QLabel(f"{np.rad2deg(self.crw_cfg.turn_std):.1f}°")
+        self.turn_slider.valueChanged.connect(
+            lambda v: self.turn_label.setText(f"{v:.1f}°")
+        )
+
+        self.home_thresh_input = QtWidgets.QDoubleSpinBox()
+        self.home_thresh_input.setRange(1.0, 50.0)
+        self.home_thresh_input.setSingleStep(1.0)
+        self.home_thresh_input.setValue(self.homing_cfg.home_threshold)
+
+        # Add agent parameters
+        self.param_layout.addRow("Bias mean", self.bias_mean_input)
+        self.param_layout.addRow("Bias std", self.bias_std_input)
+        self.param_layout.addRow("Drift std", self.drift_std_input)
+        self.param_layout.addRow("Speed", self.speed_slider)
+        self.param_layout.addRow("", self.speed_label)
+        self.param_layout.addRow("Turn std", self.turn_slider)
+        self.param_layout.addRow("", self.turn_label)
+        self.param_layout.addRow("Home threshold", self.home_thresh_input)
+
+        self.instruction_layout.addWidget(self.param_group)
+
+        # --- Environment Parameters ---
+        self.env_group = QtWidgets.QGroupBox("Environment")
+        env_layout = QtWidgets.QFormLayout()
+        self.env_group.setLayout(env_layout)
+
+        self.n_food_input = QtWidgets.QSpinBox()
+        self.n_food_input.setRange(1, 100)
+        self.n_food_input.setValue(self.env_cfg.n_food_items)
+
+        self.food_det_input = QtWidgets.QDoubleSpinBox()
+        self.food_det_input.setRange(1.0, 100.0)
+        self.food_det_input.setValue(self.env_cfg.food_detection_radius)
+
+        self.home_det_input = QtWidgets.QDoubleSpinBox()
+        self.home_det_input.setRange(1.0, 100.0)
+        self.home_det_input.setValue(self.env_cfg.home_detection_radius)
+
+        self.spawn_min_input = QtWidgets.QDoubleSpinBox()
+        self.spawn_min_input.setRange(10.0, 1000.0)
+        self.spawn_min_input.setValue(self.env_cfg.food_spawn_min_radius)
+
+        self.spawn_max_input = QtWidgets.QDoubleSpinBox()
+        self.spawn_max_input.setRange(10.0, 2000.0)
+        self.spawn_max_input.setValue(self.env_cfg.food_spawn_max_radius)
+
+        env_layout.addRow("Food items", self.n_food_input)
+        env_layout.addRow("Food detect r", self.food_det_input)
+        env_layout.addRow("Home detect r", self.home_det_input)
+        env_layout.addRow("Spawn min r", self.spawn_min_input)
+        env_layout.addRow("Spawn max r", self.spawn_max_input)
+
+        self.instruction_layout.addWidget(self.env_group)
+
+        # --- Control Buttons ---
         self.start_button = QtWidgets.QPushButton("Start Search")
         self.pause_button = QtWidgets.QPushButton("Pause Search")
         self.stop_button = QtWidgets.QPushButton("Stop Search")
-
         self.instruction_layout.addWidget(self.start_button)
         self.instruction_layout.addWidget(self.pause_button)
         self.instruction_layout.addWidget(self.stop_button)
@@ -95,7 +189,7 @@ class MainWindow(QtWidgets.QWidget):
         self.pause_button.clicked.connect(self.toggle_pause)
         self.stop_button.clicked.connect(self.stop_search)
 
-        # Init the buttons 
+        # Initial button state
         self.start_button.setEnabled(True)
         self.pause_button.setEnabled(False)
         self.stop_button.setEnabled(False)
@@ -156,6 +250,7 @@ class MainWindow(QtWidgets.QWidget):
         # --- Timer for live updates ---
         self.setup_scene()
         self.timer = QtCore.QTimer()
+        # self.timer.timeout.connect(self._animate_step)
         self.timer.timeout.connect(self.simulation_step)
         self.timer.start(30)  # ~30ms/frame
 
@@ -330,6 +425,11 @@ class MainWindow(QtWidgets.QWidget):
         pass
     
     def start_search(self):
+        if not self.validate_parameters():
+            QtWidgets.QMessageBox.warning(
+                self, "Invalid Parameters", "Fix parameters before starting simulation."
+            )
+            return
         # Reset ant & trails if coming from STOP
         self.agent.spawn(0, 0, 2.5, view=self.view)
         self.trails.reset()
@@ -358,3 +458,26 @@ class MainWindow(QtWidgets.QWidget):
             self.stop_button.setEnabled(False)
             self.pause_button.setEnabled(False)
             self.start_button.setEnabled(True)
+
+
+    def validate_parameters(self):
+        if self.bias_std_input.value() < 0:
+            return False
+        if self.drift_std_input.value() < 0:
+            return False
+        if self.speed_slider.value() <= 0:
+            return False
+        return True
+
+
+    def apply_parameters(self):
+        self.agent.bias_mean = self.bias_mean_input.value()
+        self.agent.bias_std = self.bias_std_input.value()
+        self.agent.drift_std = self.drift_std_input.value()
+
+        speed = self.speed_slider.value()
+        self.search_policy.step_length = speed
+        self.homing_policy.step_length = speed
+
+        self.search_policy.turn_std = np.deg2rad(self.turn_slider.value())
+        self.homing_policy.home_threshold = self.home_thresh_input.value()

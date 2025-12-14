@@ -12,20 +12,6 @@ def axis_line(start, end, color):  #Draw each co-ordiante axis line
     pts = np.array([start, end])
     return gl.GLLinePlotItem(pos=pts, color=color, width=3, antialias=True)
 
-# --- Math Helper: Create Axis Ticks ---
-def create_axis_ticks(axis, length, spacing=10.0, tick_size=2.0):
-    # Draws small tick marks along the axis
-    ticks = []
-    positions = np.arange(spacing, length + spacing, spacing)
-    for pos in positions:
-        if axis == 'x': start, end = [pos, -tick_size / 2, 0], [pos, tick_size / 2, 0]
-        elif axis == 'y': start, end = [-tick_size / 2, pos, 0], [tick_size / 2, pos, 0]
-        elif axis == 'z': start, end = [0, -tick_size/2, pos], [0, tick_size/2, pos]
-        
-        # Color is white with some transparency
-        ticks.append(GLLinePlotItem(pos=np.array([start, end]), color=(1,1,1,0.5), width=1))
-    return ticks
-
 ## This circle is considered as detection radius
 def create_circle(radius=10, segments=64, x=0, y=0, z=0, color=(1,0,0,1)):
     theta = np.linspace(0, 2*np.pi, segments)

@@ -14,9 +14,7 @@ from geometry import create_circle
 
 
 class Agent_Model:
-    def __init__(self, stl_path, scale=0.01,
-                 bias_mean=1.95, bias_std=2.1,
-                 drift_std=2.05):
+    def __init__(self, stl_path,agent_cfg, scale=0.01):
         """
         :param stl_path: Path to STL file
         :param scale: Scaling factor to shrink the model
@@ -25,10 +23,11 @@ class Agent_Model:
         :param drift_std: std of Gaussian *incremental* drift per move (random walk)
         """
 
-        # --- Noise params ---
-        self.bias_mean = bias_mean
-        self.bias_std = bias_std
-        self.drift_std = drift_std
+        self.agent_speed = agent_cfg.agent_speed
+        self.bias_mean   = agent_cfg.bias_mean
+        self.bias_std    = agent_cfg.bias_std
+        self.drift_std   = agent_cfg.drift_std
+
 
         # Sampleable noise state
         self.bias = np.zeros(2, dtype=float)     # fixed bias (x,y)

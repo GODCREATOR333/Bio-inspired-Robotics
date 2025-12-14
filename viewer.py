@@ -102,33 +102,33 @@ class MyView(gl.GLViewWidget):
             return
 
         # --- AGENT MOVEMENT (Arrow Keys) ---
-        moved = False
+        # moved = False
 
-        if key == Qt.Key_Up:
-            self.main.agent.move(0, +5)
-            moved = True
-        elif key == Qt.Key_Down:
-            self.main.agent.move(0, -5)
-            moved = True
-        elif key == Qt.Key_Left:
-            self.main.agent.move(-5, 0)
-            moved = True
-        elif key == Qt.Key_Right:
-            self.main.agent.move(+5, 0)
-            moved = True
-        else:
-            super().keyPressEvent(ev)
-            return
+        # if key == Qt.Key_Up:
+        #     self.main.agent.move(0, +5)
+        #     moved = True
+        # elif key == Qt.Key_Down:
+        #     self.main.agent.move(0, -5)
+        #     moved = True
+        # elif key == Qt.Key_Left:
+        #     self.main.agent.move(-5, 0)
+        #     moved = True
+        # elif key == Qt.Key_Right:
+        #     self.main.agent.move(+5, 0)
+        #     moved = True
+        # else:
+        #     super().keyPressEvent(ev)
+        #     return
 
-        # If the ant moved, update trails
-        if moved:
-            px, py, pz = self.main.agent.position
+        # # If the ant moved, update trails
+        # if moved:
+        #     px, py, pz = self.main.agent.position
 
-            true_pos = self.main.agent.get_true_pos()   # (x,y,z)
-            sim_pos  = self.main.agent.get_sim_pos()    # (x,y,z)
+        #     true_pos = self.main.agent.get_true_pos()   # (x,y,z)
+        #     sim_pos  = self.main.agent.get_sim_pos()    # (x,y,z)
 
-            # Push to trail manager
-            self.main.trails.update(true_pos, sim_pos)
+        #     # Push to trail manager
+        #     self.main.trails.update(true_pos, sim_pos)
 
-            # Update camera or whatever
-            self.follow(px, py, pz)
+        #     # Update camera or whatever
+        #     self.follow(px, py, pz)
