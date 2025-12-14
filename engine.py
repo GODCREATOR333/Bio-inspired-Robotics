@@ -78,71 +78,92 @@ class MainWindow(QtWidgets.QWidget):
         )
 
 
-        # --- Sidebar UI Setup ---
+        # ============================
+        # OUTER SPLITTER
+        # ============================
         self.outer_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.outer_splitter.setHandleWidth(6)
 
-        # Sidebar container
-        self.instruction_widget = QtWidgets.QWidget()
-        self.instruction_layout = QtWidgets.QVBoxLayout()
-        self.instruction_widget.setLayout(self.instruction_layout)
-        self.outer_splitter.addWidget(self.instruction_widget)
-        self.instruction_widget.setMinimumWidth(150)
+        # ============================
+        # SIDEBAR
+        # ============================
+        self.sidebar = QtWidgets.QWidget()
+        sidebar_layout = QtWidgets.QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(8, 8, 8, 8)
+        sidebar_layout.setSpacing(8)
 
-        # Instructions
-        self.instructions_text = QtWidgets.QTextEdit()
-        self.instructions_text.setReadOnly(True)
-        self.instructions_text.setPlainText(
-            "Instructions:\n"
-            "- Press R to reset camera and ant.\n"
-            "- Use I/O to zoom in/out.\n"
-            "- Use W/A/S/D to pan camera.\n"
-            "-------------------------------\n"
-            "--- Reference / Constants ---\n"
-            "- Home detection range: 20 mm\n"
-            "- Ant detection range: 10 mm\n"
-            "- Dead bug detection range: 10 mm\n"
-            "- Sun position: visual only"
+        # ---------- Instructions ----------
+        self.instructions = QtWidgets.QTextEdit()
+        self.instructions.setReadOnly(True)
+        self.instructions.setMaximumHeight(180)
+        self.instructions.setPlainText(
+            "=== CONTROLS ===\n"
+            "   [W / A / S / D]  : Pan Camera (X/Y Plane)\n"
+            "   [Left Mouse]     : Orbit / Rotate View\n"
+            "   [Scroll / I / O] : Zoom In / Out\n"
+            "   [R]              : RESET Simulation & View\n\n"
+
+            "=== VISUAL LEGEND ===\n"
+            "   Cyan Line    : Ground Truth Path (Physics)\n"
+            "   Purple Line  : Estimated Path (Odometry)\n"
+            "   Yellow Dots  : Sun Compass Correction Events\n"
+            "   Blue Circles : Food Detection Range\n"
+            "   Red Circle   : Home Detection Range\n\n"
+
+            "=== EXPERIMENT MODES ===\n"
+            "1. Blind Navigation (Est Pos):\n"
+            "   - Agent relies purely on noisy odometry.\n"
+            "   - EXPECTATION: Drift accumulates, Agent misses Home.\n"
+            "2. Control Group (True Pos):\n"
+            "   - Agent uses 'God Mode' (True Coordinates).\n"
+            "   - EXPECTATION: Perfect straight-line homing.\n"
+            "3. Sun Compass (Corrected):\n"
+            "   - Agent performs 'Stop-and-Scan' behavior.\n"
+            "   - EXPECTATION: Heading drift is bounded; Home is reached.\n\n"
+
+            "=== PARAMETER GUIDE ===\n"
+            "   - Bias Mean/Std : Systematic turning error (The 'Curled' Path).\n"
+            "   - Heading Noise : Random angular jitter (The 'Wobbly' Path).\n"
+            "   - Stride Noise  : Distance estimation error (The 'Overshoot').\n"
+            "   - Scan Interval : Distance (mm) between Sun corrections.\n"
         )
-        self.instructions_text.setMaximumHeight(200)
-        self.instruction_layout.addWidget(self.instructions_text)
 
-        # --- 1. EXPERIMENT SELECTOR (The Research Switch) ---
-        self.exp_group = QtWidgets.QGroupBox("Experiment Mode")
-        self.exp_layout = QtWidgets.QVBoxLayout()
-        self.exp_group.setLayout(self.exp_layout)
-        
+        sidebar_layout.addWidget(self.instructions)
+
+        # ---------- Experiment Mode ----------
+        exp_group = QtWidgets.QGroupBox("Experiment Mode")
+        exp_layout = QtWidgets.QVBoxLayout(exp_group)
+
         self.mode_selector = QtWidgets.QComboBox()
         self.mode_selector.addItems([
-            "1. Blind (Est Pos) - EXPECT DRIFT", 
-            "2. Control (True Pos) - CHEAT", 
-            "3. Sun Compass (Corrected) - SOLUTION"
+            "Blind (Estimated)",
+            "Control (True)",
+            "Sun Compass"
         ])
-        self.exp_layout.addWidget(self.mode_selector)
-        self.instruction_layout.addWidget(self.exp_group)
+        exp_layout.addWidget(self.mode_selector)
+        sidebar_layout.addWidget(exp_group)
 
-        # --- 2. DYNAMIC LOG CONSOLE (Replacing static instructions) ---
-        self.log_group = QtWidgets.QGroupBox("Simulation Log")
-        self.log_layout = QtWidgets.QVBoxLayout()
-        self.log_group.setLayout(self.log_layout)
+        # ---------- Log ----------
+        log_group = QtWidgets.QGroupBox("Simulation Log")
+        log_layout = QtWidgets.QVBoxLayout(log_group)
 
         self.console = QtWidgets.QTextEdit()
         self.console.setReadOnly(True)
-        self.console.setStyleSheet("background-color: #222; color: #0f0; font-family: Monospace; font-size: 10pt;")
-        self.console.setPlainText("--- SYSTEM READY ---\n")
-        self.log_layout.addWidget(self.console)
-        
-        self.instruction_layout.addWidget(self.log_group)
+        self.console.setStyleSheet(
+            "background:#111; color:#0f0; font-family:monospace; font-size:10pt;"
+        )
+        self.console.setPlainText("--- SYSTEM READY ---")
+        log_layout.addWidget(self.console)
 
+        sidebar_layout.addWidget(log_group, stretch=1)
 
         # ============================
-        # SCROLLABLE PARAMETERS BOX
+        # PARAMETER SCROLL AREA
         # ============================
-        self.param_scroll = QtWidgets.QScrollArea()
-        self.param_scroll.setWidgetResizable(True)
-        self.param_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.param_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.param_scroll.setFixedHeight(360)  # <-- THIS is the key
+        param_scroll = QtWidgets.QScrollArea()
+        param_scroll.setWidgetResizable(True)
+        param_scroll.setFixedHeight(360)
+        param_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
 
         param_container = QtWidgets.QWidget()
         param_layout = QtWidgets.QVBoxLayout(param_container)
@@ -153,177 +174,161 @@ class MainWindow(QtWidgets.QWidget):
         agent_group = QtWidgets.QGroupBox("Agent Parameters")
         agent_form = QtWidgets.QFormLayout(agent_group)
 
-        # --- Agent Parameters ---
-        self.param_group = QtWidgets.QGroupBox("Agent Parameters")
-        self.param_layout = QtWidgets.QFormLayout()
-        self.param_group.setLayout(self.param_layout)
-
         self.bias_mean_input = QtWidgets.QDoubleSpinBox()
-        self.bias_mean_input.setRange(-5.0, 5.0)
-        self.bias_mean_input.setSingleStep(0.1)
+        self.bias_mean_input.setRange(-5, 5)
         self.bias_mean_input.setValue(self.agent_cfg.heading_bias_mean)
 
         self.bias_std_input = QtWidgets.QDoubleSpinBox()
-        self.bias_std_input.setRange(0.0, 5.0)
-        self.bias_std_input.setSingleStep(0.1)
+        self.bias_std_input.setRange(0, 5)
         self.bias_std_input.setValue(self.agent_cfg.heading_bias_std)
 
         self.heading_noise_input = QtWidgets.QDoubleSpinBox()
-        self.heading_noise_input.setRange(0.0, 5.0)
-        self.heading_noise_input.setSingleStep(0.1)
+        self.heading_noise_input.setRange(0, 5)
         self.heading_noise_input.setValue(self.agent_cfg.heading_noise_std)
 
         self.stride_noise_input = QtWidgets.QDoubleSpinBox()
-        self.stride_noise_input.setRange(0.0, 5.0)
-        self.stride_noise_input.setSingleStep(0.1)
+        self.stride_noise_input.setRange(0, 5)
         self.stride_noise_input.setValue(self.agent_cfg.stride_noise_std)
 
         self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.speed_slider.setRange(1, 100)
         self.speed_slider.setValue(int(self.agent_cfg.agent_speed))
+
         self.speed_label = QtWidgets.QLabel(f"{self.agent_cfg.agent_speed:.1f}")
         self.speed_slider.valueChanged.connect(
             lambda v: self.speed_label.setText(f"{v:.1f}")
         )
 
+        speed_box = QtWidgets.QHBoxLayout()
+        speed_box.addWidget(self.speed_slider)
+        speed_box.addWidget(self.speed_label)
+
         self.turn_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.turn_slider.setRange(0, 90)
         self.turn_slider.setValue(int(np.rad2deg(self.crw_cfg.turn_std)))
-        self.turn_label = QtWidgets.QLabel(f"{np.rad2deg(self.crw_cfg.turn_std):.1f}°")
+
+        self.turn_label = QtWidgets.QLabel(
+            f"{np.rad2deg(self.crw_cfg.turn_std):.1f}°"
+        )
         self.turn_slider.valueChanged.connect(
             lambda v: self.turn_label.setText(f"{v:.1f}°")
         )
 
+        turn_box = QtWidgets.QHBoxLayout()
+        turn_box.addWidget(self.turn_slider)
+        turn_box.addWidget(self.turn_label)
+
+        self.scan_interval_input = QtWidgets.QDoubleSpinBox()
+        self.scan_interval_input.setRange(10, 2000)
+        self.scan_interval_input.setValue(self.agent_cfg.scan_interval)
+
         self.home_thresh_input = QtWidgets.QDoubleSpinBox()
-        self.home_thresh_input.setRange(1.0, 50.0)
-        self.home_thresh_input.setSingleStep(1.0)
+        self.home_thresh_input.setRange(1, 50)
         self.home_thresh_input.setValue(self.homing_cfg.home_threshold)
 
-        # Add agent parameters
-        self.param_layout.addRow("Heading Bias mean", self.bias_mean_input)
-        self.param_layout.addRow("Heading Bias std", self.bias_std_input)
-        self.param_layout.addRow("Heading noise std", self.heading_noise_input)
-        self.param_layout.addRow("Stride noise std", self.stride_noise_input)
-        self.param_layout.addRow("Speed", self.speed_slider)
-        self.param_layout.addRow("", self.speed_label)
-        self.param_layout.addRow("Turn std", self.turn_slider)
-        self.param_layout.addRow("", self.turn_label)
-        self.param_layout.addRow("Home threshold", self.home_thresh_input)
+        agent_form.addRow("Bias mean", self.bias_mean_input)
+        agent_form.addRow("Bias std", self.bias_std_input)
+        agent_form.addRow("Heading noise", self.heading_noise_input)
+        agent_form.addRow("Stride noise", self.stride_noise_input)
+        agent_form.addRow("Speed", speed_box)
+        agent_form.addRow("Turn std", turn_box)
+        agent_form.addRow("Scan interval", self.scan_interval_input)
+        agent_form.addRow("Home threshold", self.home_thresh_input)
 
+        param_layout.addWidget(agent_group)
 
-        # --- Environment Parameters ---
-        self.env_group = QtWidgets.QGroupBox("Environment Parameters")
-        env_layout = QtWidgets.QFormLayout()
-        self.env_group.setLayout(env_layout)
+        # ---------- Environment Parameters ----------
+        env_group = QtWidgets.QGroupBox("Environment Parameters")
+        env_form = QtWidgets.QFormLayout(env_group)
 
         self.n_food_input = QtWidgets.QSpinBox()
         self.n_food_input.setRange(1, 100)
         self.n_food_input.setValue(self.env_cfg.n_food_items)
 
         self.food_det_input = QtWidgets.QDoubleSpinBox()
-        self.food_det_input.setRange(1.0, 100.0)
+        self.food_det_input.setRange(1, 100)
         self.food_det_input.setValue(self.env_cfg.food_detection_radius)
 
         self.home_det_input = QtWidgets.QDoubleSpinBox()
-        self.home_det_input.setRange(1.0, 100.0)
+        self.home_det_input.setRange(1, 100)
         self.home_det_input.setValue(self.env_cfg.home_detection_radius)
 
         self.spawn_min_input = QtWidgets.QDoubleSpinBox()
-        self.spawn_min_input.setRange(10.0, 1000.0)
+        self.spawn_min_input.setRange(10, 1000)
         self.spawn_min_input.setValue(self.env_cfg.food_spawn_min_radius)
 
         self.spawn_max_input = QtWidgets.QDoubleSpinBox()
-        self.spawn_max_input.setRange(10.0, 2000.0)
+        self.spawn_max_input.setRange(10, 2000)
         self.spawn_max_input.setValue(self.env_cfg.food_spawn_max_radius)
 
-        env_layout.addRow("Food items", self.n_food_input)
-        env_layout.addRow("Food detect r", self.food_det_input)
-        env_layout.addRow("Home detect r", self.home_det_input)
-        env_layout.addRow("Spawn min r", self.spawn_min_input)
-        env_layout.addRow("Spawn max r", self.spawn_max_input)
+        env_form.addRow("Food items", self.n_food_input)
+        env_form.addRow("Food detect r", self.food_det_input)
+        env_form.addRow("Home detect r", self.home_det_input)
+        env_form.addRow("Spawn min r", self.spawn_min_input)
+        env_form.addRow("Spawn max r", self.spawn_max_input)
 
-        # --- Control Buttons ---
-        self.start_button = QtWidgets.QPushButton("Start Search")
-        self.pause_button = QtWidgets.QPushButton("Pause Search")
-        self.stop_button = QtWidgets.QPushButton("Stop Search")
-        self.instruction_layout.addWidget(self.start_button)
-        self.instruction_layout.addWidget(self.pause_button)
-        self.instruction_layout.addWidget(self.stop_button)
-
-        param_layout.addWidget(self.param_group)
-        param_layout.addWidget(self.env_group)
+        param_layout.addWidget(env_group)
         param_layout.addStretch(1)
 
-        # Attach container to scroll area
-        self.param_scroll.setWidget(param_container)
+        param_scroll.setWidget(param_container)
+        sidebar_layout.addWidget(param_scroll)
 
-        # Add scroll area to sidebar
-        self.instruction_layout.addWidget(self.param_scroll)
+        # ---------- Control Buttons ----------
+        controls = QtWidgets.QHBoxLayout()
 
+        self.start_button = QtWidgets.QPushButton("Start")
+        self.pause_button = QtWidgets.QPushButton("Pause")
+        self.stop_button = QtWidgets.QPushButton("Stop")
 
-        # Connect buttons
+        self.pause_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+
+        controls.addWidget(self.start_button)
+        controls.addWidget(self.pause_button)
+        controls.addWidget(self.stop_button)
+
         self.start_button.clicked.connect(self.start_search)
         self.pause_button.clicked.connect(self.toggle_pause)
         self.stop_button.clicked.connect(self.stop_search)
 
-        # Initial button state
-        self.start_button.setEnabled(True)
-        self.pause_button.setEnabled(False)
-        self.stop_button.setEnabled(False)
+        sidebar_layout.addLayout(controls)
 
-        self.instruction_layout.addStretch(1)
+        # Add sidebar
+        self.outer_splitter.addWidget(self.sidebar)
+        self.sidebar.setMinimumWidth(260)
 
-        self.instruction_widget.setMinimumWidth(150)
-
-
-        # --- Right side: vertical splitter (3D view | bottom plots) ---
+        # ============================
+        # RIGHT SIDE (VIEW + PLOTS)
+        # ============================
         self.right_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
-        self.right_splitter.setHandleWidth(6)
 
-        # 3D view (top)
         self.view = MyView()
         self.view.main = self
         self.right_splitter.addWidget(self.view)
-        self.view.setMinimumHeight(200)
 
-        # Bottom plots: horizontal splitter (XY | Error)
-        self.bottom_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        self.bottom_splitter.setHandleWidth(5)
+        bottom_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
 
-        # Left plot: XY positions
         self.xy_plot = pg.PlotWidget()
         self.xy_plot.showGrid(x=True, y=True)
-        self.xy_plot.setLabel('left', 'Y Position')
-        self.xy_plot.setLabel('bottom', 'X Position')
-        self.true_curve = self.xy_plot.plot(pen=pg.mkPen(color=(0, 180, 180), width=2))
-        self.sim_curve  = self.xy_plot.plot(pen=pg.mkPen(color=(180, 0, 180), width=2))
-        self.bottom_splitter.addWidget(self.xy_plot)
+        self.true_curve = self.xy_plot.plot(pen=pg.mkPen((0, 180, 180), width=2))
+        self.sim_curve = self.xy_plot.plot(pen=pg.mkPen((180, 0, 180), width=2))
+        bottom_splitter.addWidget(self.xy_plot)
 
-        # Right plot: error
         self.error_plot = pg.PlotWidget()
         self.error_plot.showGrid(x=True, y=True)
-        self.error_plot.setLabel('left', 'Error')
-        self.error_plot.setLabel('bottom', 'Step')
-        self.error_curve = self.error_plot.plot(pen=pg.mkPen(color=(200, 50, 50), width=2))
-        self.bottom_splitter.addWidget(self.error_plot)
+        self.error_curve = self.error_plot.plot(pen=pg.mkPen((200, 50, 50), width=2))
+        bottom_splitter.addWidget(self.error_plot)
 
-        # Add bottom splitter to vertical splitter
-        self.right_splitter.addWidget(self.bottom_splitter)
-        self.bottom_splitter.setSizes([600, 400])
+        self.right_splitter.addWidget(bottom_splitter)
 
-        # Add right splitter to outer splitter
         self.outer_splitter.addWidget(self.right_splitter)
+        self.outer_splitter.setSizes([280, 900])
 
-        # Set initial splitter sizes
-        self.outer_splitter.setSizes([100, 950])  # Sidebar vs rest
-        self.right_splitter.setSizes([500, 300])  # 3D view vs bottom
-
-        # Set layout
-        layout = QtWidgets.QHBoxLayout()
+        # ============================
+        # MAIN LAYOUT
+        # ============================
+        layout = QtWidgets.QHBoxLayout(self)
         layout.addWidget(self.outer_splitter)
-        self.setLayout(layout)
-
-        self.setMinimumSize(800, 600)
 
         # --- Timer for live updates ---
         self.setup_scene()
@@ -432,57 +437,46 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def _animate_step(self):
+        dt = 0.1 
 
-        dt = 0.1 # Simulation timestep
+        # --- REMOVED: self.fsm.update() (It moved to simulation_step) ---
 
-        # -- CHECK WORLD EVENTS (Collisions) ---
-        
-        # Scenario A: Collision with FOOD (Only relevant if searching)
+        # --- 1. COLLISION WITH FOOD (Search Mode) ---
         if self.fsm.state == AgentState.SEARCH:
-            # Check collision using True Physics Position
+            # (No changes here, logic was fine)
             found, items_to_remove = self.environment.check_food_collision(self.agent.get_true_pos())
-            
             if found:
-                # 1. Remove graphics
                 for item in items_to_remove:
                     self.view.removeItem(item)
-                
-                # 2. Force State Change
                 self.fsm.set_state(AgentState.RETURN)
 
-        # Scenario B: Collision with HOME (Only relevant if Returning)
-        # We check the result ONLY when the agent decides to stop.
+        # --- 2. COLLISION WITH HOME (The Judge) ---
         if self.fsm.state == AgentState.STOP:
-            
-            # Now we look at Truth
+            # Judge using TRUE positions
             true_pos = self.agent.get_true_pos()[:2]
-            dist_error = np.linalg.norm(true_pos) # Dist from (0,0)
+            dist_center_to_center = np.linalg.norm(true_pos)
             
-            # Check if it was a Success or a Miss
-            if dist_error < self.env_cfg.home_detection_radius:
-                #This happens if drift was low, or it got lucky
-                print(f"SUCCESS: Arrived! Error: {dist_error:.2f}mm")
-                pass 
+            # --- CHANGED: FAIR CHECK (Ant Radius + Home Radius) ---
+            # Get ant radius (default to 10.0 if missing)
+            ant_r = getattr(self.agent, 'ant_radius', 10.0) 
+            home_r = self.env_cfg.home_detection_radius
+            
+            # The Edge-to-Edge threshold
+            combined_threshold = ant_r + home_r
+            
+            if dist_center_to_center < combined_threshold:
+                print(f"SUCCESS: Arrived! (Dist: {dist_center_to_center:.2f})")
             else:
-                # This is the expected "Blind Navigation" outcome
-                print(f"FAILED: Missed Nest by {dist_error:.2f}mm")
-                pass
-        
-        # Update XY plot
-        if len(self.trails.true_trail_data) > 0:
-            self.true_curve.setData(
-                self.trails.true_trail_data[:, 0],
-                self.trails.true_trail_data[:, 1]
-            )
-            self.sim_curve.setData(
-                self.trails.sim_trail_data[:, 0],
-                self.trails.sim_trail_data[:, 1]
-            )
+                gap = dist_center_to_center - combined_threshold
+                print(f"FAILED: Missed by {gap:.2f}mm")
 
-        # Compute error (distance between true and sim positions)
+        # --- 3. PLOTS (No changes) ---
+        if len(self.trails.true_trail_data) > 0:
+            self.true_curve.setData(self.trails.true_trail_data[:, 0], self.trails.true_trail_data[:, 1])
+            self.sim_curve.setData(self.trails.sim_trail_data[:, 0], self.trails.sim_trail_data[:, 1])
+
         errors = np.linalg.norm(
-            self.trails.true_trail_data[:, :2] - self.trails.sim_trail_data[:, :2],
-            axis=1
+            self.trails.true_trail_data[:, :2] - self.trails.sim_trail_data[:, :2], axis=1
         ) if len(self.trails.true_trail_data) > 0 else np.array([])
         self.error_curve.setData(errors)
 
@@ -490,76 +484,65 @@ class MainWindow(QtWidgets.QWidget):
     def simulation_step(self):
         if not self.simulation_active:
             return
+          
+        self.step_count += 1
+        mode_index = self.mode_selector.currentIndex()
+
+        # --- LOGIC BLOCK 1: SUN COMPASS (Mode 2) ---
+        if mode_index == 2:
+            if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
+                SCAN_THRESHOLD_MM = self.agent.scan_threshold 
+                if self.agent.distance_since_last_scan >= SCAN_THRESHOLD_MM:
+                    self.agent.scan_sun()
+                    self.log("Sun Scan: Heading Corrected.")
+
+                    # Add Marker at True Position
+                    tx, ty, tz = self.agent.get_true_pos()
+                    scan_circle = create_circle(radius=5, x=tx, y=ty, z=1, color=(1, 1, 0, 1))
+                    self.view.addItem(scan_circle)
+                    self.scan_markers.append(scan_circle)
+
+        # --- LOGIC BLOCK 2: MOVEMENT ---
+        # Case: Cheat Mode (Mode 1) AND Returning
+        if mode_index == 1 and self.fsm.state == AgentState.RETURN:
+            # Drive using True Position
+            true_pos = self.agent.get_true_pos()[:2]
+            dx, dy, done = self.fsm.homing_policy.step(true_pos)
+            self.agent.move(dx, dy)
+            if done: self.fsm.set_state(AgentState.STOP)
+            
+        # Case: Standard FSM (Mode 0 & Mode 2)
         else:
-            self.step_count += 1
-            # 1. Check Experiment Mode
-            mode_index = self.mode_selector.currentIndex()
-            #2
-                # --- MODE 2: SUN COMPASS LOGIC ---
-            # If in "Sun Compass" mode, simulate intermittent scanning
-                
-            # --- MODE 2: SUN COMPASS LOGIC ---
-            if mode_index == 2:
-                if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
-                    
-                    # TRIGGER: Scan every 100mm of travel
-                    # If speed is 3.0, this happens every ~33 frames.
-                    # If speed is 50.0, this happens every ~2 frames.
-                    SCAN_THRESHOLD_MM = 100.0 
-                    
-                    if self.agent.distance_since_last_scan >= SCAN_THRESHOLD_MM:
-                        self.agent.scan_sun()
-                        self.log("Sun Scan: Heading Corrected.")
+            # Drive using Est Position
+            self.fsm.update()
 
-                        # We use TRUE position so the dot appears under the Ant mesh
-                        tx, ty, tz = self.agent.get_true_pos()
-                        
-                        # Optional: Add a visual marker (Yellow Flash)
-                        scan_circle = create_circle(radius=5, x=tx, y=ty, z=1, color=(1, 1, 0, 1))
-                        self.view.addItem(scan_circle)
-
-                        self.scan_markers.append(scan_circle)
-
-  
-
-            # --- Run FSM Update ---
-            # Special Case for Mode 1 (Cheat):
-            if mode_index == 1 and self.fsm.state == AgentState.RETURN:
-                # Feed TRUE position to homing policy temporarily
-                true_pos = self.agent.get_true_pos()[:2]
-                dx, dy, done = self.fsm.homing_policy.step(true_pos)
-                self.agent.move(dx, dy)
-                if done: self.fsm.set_state(AgentState.STOP)
-            else:
-                # Normal FSM (Uses Sim Position)
-                self.fsm.update()
-            
-            # 2. Only log trails if agent moved
+        # --- LOGIC BLOCK 3: UPDATE VISUALS ---
         if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
-            true_pos = self.agent.get_true_pos()
-            sim_pos = self.agent.get_sim_pos()
-            self.trails.update(true_pos, sim_pos)
+            self.trails.update(self.agent.get_true_pos(), self.agent.get_sim_pos())
             
-            #4
+            # Animate Step handles Collisions & Plots
             self._animate_step()
             
-
-            # Update Camera Position to follow the ant
+            # Camera Follow
             px, py, pz = self.agent.position
             self.view.follow(px, py, pz)
 
+        # --- LOGIC BLOCK 4: END GAME LOGGING (Updated Logic) ---
         if self.fsm.state == AgentState.STOP and not self.results_logged:
             true_pos = self.agent.get_true_pos()[:2]
             dist_error = np.linalg.norm(true_pos)
             
-            radius = self.env_cfg.home_detection_radius
+            # --- CHANGED: Use combined threshold here too ---
+            ant_r = getattr(self.agent, 'ant_radius', 10.0) 
+            combined_threshold = self.env_cfg.home_detection_radius + ant_r
             
-            if dist_error < radius:
+            if dist_error < combined_threshold:
                 self.log(f"SUCCESS: Home reached! (Err: {dist_error:.1f}mm)")
             else:
-                self.log(f"FAILED: Missed Nest by {dist_error:.1f}mm")
+                gap = dist_error - combined_threshold
+                self.log(f"FAILED: Missed Nest by {gap:.1f}mm")
             
-            self.results_logged = True # Prevent spamming log every frame
+            self.results_logged = True
             self.cleanup_experiment()
 
 
@@ -577,6 +560,7 @@ class MainWindow(QtWidgets.QWidget):
             self.stride_noise_input,
             self.heading_noise_input,
             self.speed_slider,
+            self.scan_interval_input,
             self.turn_slider,
             self.home_thresh_input,
             self.n_food_input,
@@ -595,7 +579,6 @@ class MainWindow(QtWidgets.QWidget):
             return
         
         self.simulation_active = True
-        self.log("Simulation Started.")
         # Reset flags
         self.results_logged = False
         self.step_count = 0
@@ -611,6 +594,7 @@ class MainWindow(QtWidgets.QWidget):
         self.start_button.setEnabled(False)
         self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
+        self.log("Simulation Started.")
 
     def toggle_pause(self):
         # If we are running (Search or Return), we PAUSE
@@ -637,7 +621,6 @@ class MainWindow(QtWidgets.QWidget):
             self.fsm.set_state(AgentState.STOP)
             self.log("Simulation stopped by user.")
             
-            self.timer.stop()
             # Use the same cleanup logic
             self.cleanup_experiment()
 
@@ -660,6 +643,7 @@ class MainWindow(QtWidgets.QWidget):
         self.agent.heading_bias_std = self.bias_std_input.value()
         self.agent.heading_noise_std = self.heading_noise_input.value()
         self.agent.stride_noise_std = self.stride_noise_input.value()
+        self.agent.scan_threshold = self.scan_interval_input.value()
 
         # Navigation speed / CRW / homing
         speed = self.speed_slider.value()
@@ -752,7 +736,7 @@ class MainWindow(QtWidgets.QWidget):
         # 1. Re-enable all parameter controls
         for w in [
             self.bias_mean_input, self.bias_std_input, self.stride_noise_input,
-            self.heading_noise_input, self.speed_slider, self.turn_slider,
+            self.heading_noise_input, self.speed_slider,self.scan_interval_input, self.turn_slider,
             self.home_thresh_input, self.n_food_input, self.food_det_input,
             self.home_det_input, self.spawn_min_input, self.spawn_max_input,
             self.mode_selector # Don't forget the mode selector!

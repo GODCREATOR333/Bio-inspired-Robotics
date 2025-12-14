@@ -27,10 +27,13 @@ class Agent_Model:
         self.heading_noise_std   = agent_cfg.heading_noise_std
         self.stride_noise_std   = agent_cfg.stride_noise_std
         self.distance_since_last_scan = 0.0
+        self.scan_threshold = agent_cfg.scan_interval
 
         # Store scale factor
         self.scale_factor = scale
-        self.detection_circle = None
+
+        self.ant_detection_range: float = 10.0
+        self.ant_detection_circle = None
 
         # --- Load STL ---
         self.raw_mesh = mesh.Mesh.from_file(stl_path)
@@ -105,14 +108,14 @@ class Agent_Model:
         self.heading = 0.0
         self.heading_est = self.heading + self.heading_bias  # initial compass miscalibration
 
-        if self.detection_circle is not None:
-            self.detection_circle.resetTransform()
-            self.detection_circle.translate(x, y, 0)
+        if self.ant_detection_circle is not None:
+            self.ant_detection_circle.resetTransform()
+            self.ant_detection_circle.translate(x, y, 0)
 
         # Create circle only once if view is provided
         elif view is not None:
-            self.detection_circle = create_circle(radius=10, x=x, y=y, z=0, color=(1,0,0,0.3))
-            view.addItem(self.detection_circle)
+            self.ant_detection_circle = create_circle(radius=self.ant_detection_range, x=x, y=y, z=0, color=(1,0,0,0.3))
+            view.addItem(self.ant_detection_circle)
 
 
     def move(self, dx, dy):
@@ -150,8 +153,8 @@ class Agent_Model:
 
         self.px, self.py, self.pz = self.perceived_position
 
-        if self.detection_circle is not None:
-            self.detection_circle.translate(dx, dy, 0)
+        if self.ant_detection_circle is not None:
+            self.ant_detection_circle.translate(dx, dy, 0)
 
     # Rotate around Z-axis
     def rotate(self, angle_deg):
@@ -183,7 +186,7 @@ class Agent_Model:
         # 2. Add Sensor Noise
         # Even the sun compass isn't perfect (e.g., 1 degree error)
         # We use a small noise, distinct from the walking drift.
-        sun_sensor_noise = np.random.normal(0.0, np.deg2rad(0.5))
+        sun_sensor_noise = np.random.normal(0.0, np.deg2rad(0.))
         
         measured_heading = true_heading + sun_sensor_noise
         

@@ -16,6 +16,8 @@ class AgentConfig:
     heading_noise_std: float = np.deg2rad(0.5) # rad per step
     stride_noise_std: float = 0.02             # fraction
 
+    scan_interval: float = 100.0  # mm (Distance between Sun Scans)
+
 @dataclass
 class CRWConfig:
     turn_std: float = np.deg2rad(15.0)
