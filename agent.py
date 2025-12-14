@@ -26,6 +26,7 @@ class Agent_Model:
         self.heading_bias_std   = agent_cfg.heading_bias_std
         self.heading_noise_std   = agent_cfg.heading_noise_std
         self.stride_noise_std   = agent_cfg.stride_noise_std
+        self.distance_since_last_scan = 0.0
 
         # Store scale factor
         self.scale_factor = scale
@@ -140,6 +141,9 @@ class Agent_Model:
         # Old Method 
         #perceived_heading = step_angle + self.heading_bias + self.heading_est
 
+        #Count total steps 
+        self.distance_since_last_scan += step_dist
+        
         self.perceived_position[0] += step_dist_est * np.cos(perceived_heading)
         self.perceived_position[1] += step_dist_est * np.sin(perceived_heading)
         self.perceived_position[2] = self.position[2]
@@ -159,4 +163,44 @@ class Agent_Model:
 
     def get_sim_pos(self):
         return self.perceived_position.copy()
+    
+
+    def scan_sun(self):
+        """
+        Simulates the 'Stop and Scan' behavior.
+        The ant looks at the polarization pattern (Sun) and resets its
+        internal heading estimate to match the Truth (plus some sensor noise).
+        """
+        from geometry import normalize_angle
+        
+        # 1. Get True Heading (The Absolute Reference)
+        # In a warehouse, this is the angle of ceiling lights.
+        true_heading = self.heading  # This is the physics truth
+
+        # RESET the distance counter
+        self.distance_since_last_scan = 0.0
+        
+        # 2. Add Sensor Noise
+        # Even the sun compass isn't perfect (e.g., 1 degree error)
+        # We use a small noise, distinct from the walking drift.
+        sun_sensor_noise = np.random.normal(0.0, np.deg2rad(0.5))
+        
+        measured_heading = true_heading + sun_sensor_noise
+        
+        # 3. RESET the internal estimate
+        # The ant overwrites its bad dead-reckoning with the fresh sun reading.
+        # We effectively delete the accumulated 'heading_est' error.
+        
+        # Current logic: perceived = true + error
+        # Therefore: error = perceived - true
+        # We want to force perceived to be close to true.
+        
+        # Re-align the estimated heading to the measured heading
+        self.heading_est = measured_heading - true_heading 
+        
+        # Note: In your specific move() implementation, 'heading_est' *IS* the accumulated error.
+        # So setting it to 0.0 (plus sensor noise) snaps the ghost ant back to parallel.
+        self.heading_est = sun_sensor_noise
+    
+
     

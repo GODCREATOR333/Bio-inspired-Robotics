@@ -85,3 +85,8 @@ def create_sun(x=0, y=0, z=100, radius=8, ray_length=20, color=(1, 1, 0, 1)):
         rays.append(ray)
 
     return [sphere] + rays
+
+
+def normalize_angle(angle):
+    """Keeps angle between -pi and +pi"""
+    return (angle + np.pi) % (2 * np.pi) - np.pi

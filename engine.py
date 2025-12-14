@@ -39,6 +39,7 @@ class MainWindow(QtWidgets.QWidget):
         self.home_circle_item = None
         self.food_mesh_items = []
         self.food_circle_items = []
+        self.scan_markers = []
 
 
         # --- State Flags ---
@@ -433,12 +434,8 @@ class MainWindow(QtWidgets.QWidget):
     def _animate_step(self):
 
         dt = 0.1 # Simulation timestep
-        
-        # --- 1. RUN AGENT LOGIC (Movement) ---
-        # The FSM calculates the move and updates the agent's position
-        self.fsm.update()
 
-        # --- 2. CHECK WORLD EVENTS (Collisions) ---
+        # -- CHECK WORLD EVENTS (Collisions) ---
         
         # Scenario A: Collision with FOOD (Only relevant if searching)
         if self.fsm.state == AgentState.SEARCH:
@@ -500,13 +497,30 @@ class MainWindow(QtWidgets.QWidget):
             #2
                 # --- MODE 2: SUN COMPASS LOGIC ---
             # If in "Sun Compass" mode, simulate intermittent scanning
+                
+            # --- MODE 2: SUN COMPASS LOGIC ---
             if mode_index == 2:
-                # Every 2 seconds (approx 60 frames), fix the heading
-                # (We use a simple frame counter or timer here)
-                if self.step_count % 60 == 0: 
-                    # You need to implement 'correct_heading()' in Agent
-                    # self.agent.scan_sun() 
-                    self.log("Sun Scan: Heading Corrected.")
+                if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
+                    
+                    # TRIGGER: Scan every 100mm of travel
+                    # If speed is 3.0, this happens every ~33 frames.
+                    # If speed is 50.0, this happens every ~2 frames.
+                    SCAN_THRESHOLD_MM = 100.0 
+                    
+                    if self.agent.distance_since_last_scan >= SCAN_THRESHOLD_MM:
+                        self.agent.scan_sun()
+                        self.log("Sun Scan: Heading Corrected.")
+
+                        # We use TRUE position so the dot appears under the Ant mesh
+                        tx, ty, tz = self.agent.get_true_pos()
+                        
+                        # Optional: Add a visual marker (Yellow Flash)
+                        scan_circle = create_circle(radius=5, x=tx, y=ty, z=1, color=(1, 1, 0, 1))
+                        self.view.addItem(scan_circle)
+
+                        self.scan_markers.append(scan_circle)
+
+  
 
             # --- Run FSM Update ---
             # Special Case for Mode 1 (Cheat):
@@ -663,12 +677,17 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def rebuild_environment(self):
+
+        # Clear Logs
+        self.clear_log()
+
+
         # 1. Clear existing items from the View
         if self.home_circle_item is not None:
             self.view.removeItem(self.home_circle_item)
             self.home_circle_item = None
 
-        # Remove Food Meshes (SAFE VERSION)
+        # Remove Food Meshes
         for m in self.food_mesh_items:
             try:
                 self.view.removeItem(m)
@@ -676,13 +695,16 @@ class MainWindow(QtWidgets.QWidget):
                 pass # Item was already removed (eaten) during the sim
         self.food_mesh_items.clear()
 
-        # Remove Food Circles (SAFE VERSION)
+        # Remove Food Circles 
         for c in self.food_circle_items:
             try:
                 self.view.removeItem(c)
             except ValueError:
                 pass # Item was already removed (eaten) during the sim
         self.food_circle_items.clear()
+
+        # --- REMOVE OLD SCAN MARKERS ---
+        self.clear_scan_markers()
 
         # 2. Reset and Rebuild the Logic/Physics world
         self.environment.reset()
@@ -745,3 +767,17 @@ class MainWindow(QtWidgets.QWidget):
 
         # 3. Log
         self.log("Simulation ended. Parameters unlocked.")
+
+    def clear_log(self):
+        """Clears the sidebar console log if it is not empty."""
+        if not self.console.document().isEmpty():
+            self.console.clear()
+    
+    def clear_scan_markers(self):
+        """Helper to remove all yellow scan dots from the scene."""
+        for marker in self.scan_markers:
+            try:
+                self.view.removeItem(marker)
+            except ValueError:
+                pass # Already removed or invalid
+        self.scan_markers.clear()

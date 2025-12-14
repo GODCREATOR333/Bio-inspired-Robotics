@@ -99,6 +99,12 @@ class MyView(gl.GLViewWidget):
 
             # Reset trail
             self.main.trails.reset()
+
+            # Reset Scan markers
+            self.main.clear_scan_markers()
+
+            # Log Reset
+            self.main.log("View and Visuals Reset via Hotkey.")
             return
 
         # --- AGENT MOVEMENT (Arrow Keys) ---

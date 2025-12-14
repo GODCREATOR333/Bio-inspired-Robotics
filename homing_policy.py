@@ -17,7 +17,9 @@ class VectorHoming:
         v = -pos
         dist = np.linalg.norm(v)
 
-        if dist < self.home_threshold:
+        # FIX: Stop if we are within threshold OR if one step would overshoot
+        # This prevents the "Orbiting" bug.
+        if dist < self.home_threshold or dist < self.step_length:
             return 0.0, 0.0, True
 
         direction = v / dist
