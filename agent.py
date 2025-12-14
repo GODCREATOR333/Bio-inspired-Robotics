@@ -1,7 +1,6 @@
 import numpy as np
 from stl import mesh
 import pyqtgraph.opengl as gl
-from PyQt5 import QtGui
 from geometry import create_circle
 
 
@@ -18,20 +17,15 @@ class Agent_Model:
         """
         :param stl_path: Path to STL file
         :param scale: Scaling factor to shrink the model
-        :param bias_mean: mean of Gaussian bias (applied to x,y)
-        :param bias_std:  std of Gaussian bias (applied to x,y)
-        :param drift_std: std of Gaussian *incremental* drift per move (random walk)
         """
-        
+
+        self.heading = 0.0        # true heading
+        self.heading_est = 0.0    # perceived heading
         self.agent_speed = agent_cfg.agent_speed
-        self.bias_mean   = agent_cfg.bias_mean
-        self.bias_std    = agent_cfg.bias_std
-        self.drift_std   = agent_cfg.drift_std
-
-
-        # Sampleable noise state
-        self.bias = np.zeros(2, dtype=float)     # fixed bias (x,y)
-        self.drift = np.zeros(2, dtype=float)    # accumulated drift (x,y)
+        self.heading_bias_mean   = agent_cfg.heading_bias_mean
+        self.heading_bias_std   = agent_cfg.heading_bias_std
+        self.heading_noise_std   = agent_cfg.heading_noise_std
+        self.stride_noise_std   = agent_cfg.stride_noise_std
 
         # Store scale factor
         self.scale_factor = scale
@@ -53,10 +47,6 @@ class Agent_Model:
         self.perceived_position = self.position.copy() #Perceived Position of the ant
         self.rotation = 0.0  # degrees
 
-        # --- Perceived (noisy) state ---
-        # Initially matches true position (bias + drift applied when move() is called)
-        self.perceived_position = self.position.copy()
-
         # --- Create GLMeshItem ---
         self.mesh_item = gl.GLMeshItem(
             vertexes=self.vertices,
@@ -70,25 +60,31 @@ class Agent_Model:
 
         # init noise samples
         self.resample_bias()
-        self.reset_drift()
 
     # --- Noise utilities ---
     def resample_bias(self):
-        """Sample a new fixed Gaussian bias for x,y."""
-        self.bias = np.random.normal(self.bias_mean, self.bias_std, size=2)
+        self.heading_bias = np.random.normal(
+            self.heading_bias_mean,
+            self.heading_bias_std
+        )
 
-    def reset_drift(self):
-        """Reset accumulated drift to zero."""
-        self.drift[:] = 0.0
+    def configure_noise(
+        self,
+        heading_bias_mean=None,
+        heading_bias_std=None,
+        heading_noise_std=None,
+        stride_noise_std=None,
+        resample_bias=False
+    ):
+        if heading_bias_mean is not None:
+            self.heading_bias_mean = heading_bias_mean
+        if heading_bias_std is not None:
+            self.heading_bias_std = heading_bias_std
+        if heading_noise_std is not None:
+            self.heading_noise_std = heading_noise_std
+        if stride_noise_std is not None:
+            self.stride_noise_std = stride_noise_std
 
-    def configure_noise(self, bias_mean=None, bias_std=None, drift_std=None, resample_bias=False):
-        """Change noise parameters at runtime. Optionally resample bias immediately."""
-        if bias_mean is not None:
-            self.bias_mean = bias_mean
-        if bias_std is not None:
-            self.bias_std = bias_std
-        if drift_std is not None:
-            self.drift_std = drift_std
         if resample_bias:
             self.resample_bias()
 
@@ -102,9 +98,11 @@ class Agent_Model:
         self.position[:] = (x, y, z)
         self.mesh_item.translate(x, y, z)
 
-        # Reset perceived state to true + current bias (no drift)
-        self.reset_drift()
-        self.perceived_position = np.array([x + self.bias[0], y + self.bias[1], z], dtype=float)
+        self.perceived_position = np.array([x, y, z], dtype=float)
+
+        # Odometry init
+        self.heading = 0.0
+        self.heading_est = self.heading + self.heading_bias  # initial compass miscalibration
 
         if self.detection_circle is not None:
             self.detection_circle.resetTransform()
@@ -115,25 +113,32 @@ class Agent_Model:
             self.detection_circle = create_circle(radius=10, x=x, y=y, z=0, color=(1,0,0,0.3))
             view.addItem(self.detection_circle)
 
-    # Move in XY plane (true motion)
+
     def move(self, dx, dy):
-        # Update true position
+        # True Position
         self.position[0] += dx
         self.position[1] += dy
         self.mesh_item.translate(dx, dy, 0)
 
-        # Update drift: random walk (Gaussian increment)
-        if self.drift_std > 0.0:
-            inc = np.random.normal(0.0, self.drift_std, size=2)
-            self.drift += inc
 
-        # Compute perceived position = true + bias + drift (Z unchanged)
-        px = self.position[0] + self.bias[0] + self.drift[0]
-        py = self.position[1] + self.bias[1] + self.drift[1]
-        pz = self.position[2]  # keep Z same (no noise)
-        self.perceived_position = np.array([px, py, pz], dtype=float)
+        # True Steps
+        step_angle = np.arctan2(dy, dx)
+        step_dist = np.hypot(dx, dy)
 
-        # If detection circle exists, move it with true position
+        heading_noise = np.random.normal(0.0, self.heading_noise_std)
+        stride_scale = np.random.normal(1.0, self.stride_noise_std)
+
+        stride_scale = np.random.normal(1.0, self.stride_noise_std)
+        step_dist_est = step_dist * stride_scale
+
+        perceived_heading = step_angle + self.heading_bias + self.heading_est
+
+        self.perceived_position[0] += step_dist_est * np.cos(perceived_heading)
+        self.perceived_position[1] += step_dist_est * np.sin(perceived_heading)
+        self.perceived_position[2] = self.position[2]
+
+        self.px, self.py, self.pz = self.perceived_position
+
         if self.detection_circle is not None:
             self.detection_circle.translate(dx, dy, 0)
 

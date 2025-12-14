@@ -9,9 +9,12 @@ import numpy as np
 @dataclass
 class AgentConfig:
     agent_speed: float = 3.0
-    bias_mean: float = 1.5
-    bias_std: float = np.deg2rad(5.0)
-    drift_std: float = np.deg2rad(5.5)
+
+    heading_bias_mean: float = 0.0            # rad
+    heading_bias_std: float = np.deg2rad(5.0) # rad (initial compass offset)
+
+    heading_noise_std: float = np.deg2rad(5.5) # rad per step
+    stride_noise_std: float = 0.05             # fraction
 
 @dataclass
 class CRWConfig:

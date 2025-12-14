@@ -103,17 +103,22 @@ class MainWindow(QtWidgets.QWidget):
         self.bias_mean_input = QtWidgets.QDoubleSpinBox()
         self.bias_mean_input.setRange(-5.0, 5.0)
         self.bias_mean_input.setSingleStep(0.1)
-        self.bias_mean_input.setValue(self.agent_cfg.bias_mean)
+        self.bias_mean_input.setValue(self.agent_cfg.heading_bias_mean)
 
         self.bias_std_input = QtWidgets.QDoubleSpinBox()
         self.bias_std_input.setRange(0.0, 5.0)
         self.bias_std_input.setSingleStep(0.1)
-        self.bias_std_input.setValue(self.agent_cfg.bias_std)
+        self.bias_std_input.setValue(self.agent_cfg.heading_bias_std)
 
-        self.drift_std_input = QtWidgets.QDoubleSpinBox()
-        self.drift_std_input.setRange(0.0, 5.0)
-        self.drift_std_input.setSingleStep(0.1)
-        self.drift_std_input.setValue(self.agent_cfg.drift_std)
+        self.heading_noise_input = QtWidgets.QDoubleSpinBox()
+        self.heading_noise_input.setRange(0.0, 5.0)
+        self.heading_noise_input.setSingleStep(0.1)
+        self.heading_noise_input.setValue(self.agent_cfg.heading_noise_std)
+
+        self.stride_noise_input = QtWidgets.QDoubleSpinBox()
+        self.stride_noise_input.setRange(0.0, 5.0)
+        self.stride_noise_input.setSingleStep(0.1)
+        self.stride_noise_input.setValue(self.agent_cfg.stride_noise_std)
 
         self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.speed_slider.setRange(1, 100)
@@ -137,9 +142,10 @@ class MainWindow(QtWidgets.QWidget):
         self.home_thresh_input.setValue(self.homing_cfg.home_threshold)
 
         # Add agent parameters
-        self.param_layout.addRow("Bias mean", self.bias_mean_input)
-        self.param_layout.addRow("Bias std", self.bias_std_input)
-        self.param_layout.addRow("Drift std", self.drift_std_input)
+        self.param_layout.addRow("Heading Bias mean", self.bias_mean_input)
+        self.param_layout.addRow("Heading Bias std", self.bias_std_input)
+        self.param_layout.addRow("Heading noise std", self.heading_noise_input)
+        self.param_layout.addRow("Stride noise std", self.stride_noise_input)
         self.param_layout.addRow("Speed", self.speed_slider)
         self.param_layout.addRow("", self.speed_label)
         self.param_layout.addRow("Turn std", self.turn_slider)
@@ -224,7 +230,7 @@ class MainWindow(QtWidgets.QWidget):
         self.xy_plot.showGrid(x=True, y=True)
         self.xy_plot.setLabel('left', 'Y Position')
         self.xy_plot.setLabel('bottom', 'X Position')
-        self.true_curve = self.xy_plot.plot(pen=pg.mkPen(color=(0, 180, 0), width=2))
+        self.true_curve = self.xy_plot.plot(pen=pg.mkPen(color=(0, 180, 180), width=2))
         self.sim_curve  = self.xy_plot.plot(pen=pg.mkPen(color=(180, 0, 180), width=2))
         self.bottom_splitter.addWidget(self.xy_plot)
 
@@ -353,6 +359,9 @@ class MainWindow(QtWidgets.QWidget):
         for item in sun_items:
             self.view.addItem(item)
 
+        self.view.addItem(self.trails.true_trail)
+        self.view.addItem(self.trails.sim_trail)
+
 
 
     def _animate_step(self):
@@ -406,7 +415,8 @@ class MainWindow(QtWidgets.QWidget):
         for w in [
             self.bias_mean_input,
             self.bias_std_input,
-            self.drift_std_input,
+            self.stride_noise_input,
+            self.heading_noise_input,
             self.speed_slider,
             self.turn_slider,
             self.home_thresh_input,
@@ -429,16 +439,8 @@ class MainWindow(QtWidgets.QWidget):
         self.apply_parameters()
         self.rebuild_environment()
 
-        print("n_food_items cfg:", self.environment.cfg.n_food_items)
-        print("food_items stored:", len(self.environment.food_items))
-        print("renderables:", len(self.environment.get_renderables()))
-
-
-
         self.agent.spawn(0, 0, 2.5, view=self.view)
-        self.trails.reset()
-        self.view.addItem(self.trails.true_trail)
-        self.view.addItem(self.trails.sim_trail)
+        self.trails.reset() 
         self.fsm.set_state(AgentState.SEARCH)
         self.pause_button.setText("Pause")
         self.start_button.setEnabled(False)
@@ -470,7 +472,8 @@ class MainWindow(QtWidgets.QWidget):
         for w in [
             self.bias_mean_input,
             self.bias_std_input,
-            self.drift_std_input,
+            self.stride_noise_input,
+            self.heading_noise_input,
             self.speed_slider,
             self.turn_slider,
             self.home_thresh_input,
@@ -486,7 +489,9 @@ class MainWindow(QtWidgets.QWidget):
     def validate_parameters(self):
         if self.bias_std_input.value() < 0:
             return False
-        if self.drift_std_input.value() < 0:
+        if self.heading_noise_input.value() < 0:
+            return False
+        if self.stride_noise_input.value() < 0:
             return False
         if self.speed_slider.value() <= 0:
             return False
@@ -495,9 +500,10 @@ class MainWindow(QtWidgets.QWidget):
 
     def apply_parameters(self):
         # Agent
-        self.agent.bias_mean = self.bias_mean_input.value()
-        self.agent.bias_std = self.bias_std_input.value()
-        self.agent.drift_std = self.drift_std_input.value()
+        self.agent.heading_bias_mean = self.bias_mean_input.value()
+        self.agent.heading_bias_std = self.bias_std_input.value()
+        self.agent.heading_noise_std = self.heading_noise_input.value()
+        self.agent.stride_noise_std = self.stride_noise_input.value()
 
         # Navigation speed / CRW / homing
         speed = self.speed_slider.value()
