@@ -22,7 +22,7 @@ class Agent_Model:
         :param bias_std:  std of Gaussian bias (applied to x,y)
         :param drift_std: std of Gaussian *incremental* drift per move (random walk)
         """
-
+        
         self.agent_speed = agent_cfg.agent_speed
         self.bias_mean   = agent_cfg.bias_mean
         self.bias_std    = agent_cfg.bias_std

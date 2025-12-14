@@ -3,7 +3,7 @@ import numpy as np
 
 
 class VectorHoming:
-    def __init__(self, step_length=1.0, home_threshold=1.0):
+    def __init__(self, step_length, home_threshold):
         self.step_length = step_length
         self.home_threshold = home_threshold
 

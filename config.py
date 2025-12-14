@@ -2,6 +2,10 @@
 from dataclasses import dataclass
 import numpy as np
 
+
+
+# Do no edit the config file. Use the UI.
+
 @dataclass
 class AgentConfig:
     agent_speed: float = 3.0

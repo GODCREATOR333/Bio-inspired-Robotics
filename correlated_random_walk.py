@@ -5,8 +5,8 @@ import numpy as np
 class CorrelatedRandomWalk:
     def __init__(
         self,
-        step_length=1.0,
-        turn_std=np.deg2rad(20.0),  # angular noise (radians)
+        step_length,
+        turn_std,  # angular noise (radians)
         rng=None,
     ):
         """

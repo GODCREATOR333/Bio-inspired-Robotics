@@ -9,7 +9,7 @@ from viewer import MyView
 import geometry
 from agent import Agent_Model
 from geometry import create_circle,create_sun
-from food import Food_Model
+from environment import Food_Model,Environment
 from utils import random_point_outside_radius,TrailManager
 from config import AgentConfig,CRWConfig,HomingConfig,EnvironmentConfig
 
@@ -30,6 +30,11 @@ class MainWindow(QtWidgets.QWidget):
         self.crw_cfg = CRWConfig()
         self.homing_cfg = HomingConfig()
         self.env_cfg=EnvironmentConfig()
+        self.environment = Environment(self.env_cfg)
+        self.home_circle_item = None
+        self.food_mesh_items = []
+        self.food_circle_items = []
+
 
 
         # --- Trails and agent ---
@@ -45,12 +50,12 @@ class MainWindow(QtWidgets.QWidget):
         # --- Navigation policies ---
         self.search_policy = CorrelatedRandomWalk(
             step_length=self.agent.agent_speed,
-            turn_std=np.deg2rad(15)
+            turn_std=self.crw_cfg.turn_std 
         )
 
         self.homing_policy = VectorHoming(
             step_length=self.agent.agent_speed,
-            home_threshold=5.0
+            home_threshold=self.homing_cfg.home_threshold
         )
 
         # --- FSM ---
@@ -341,11 +346,6 @@ class MainWindow(QtWidgets.QWidget):
         # Add agent(Ant) to scene
         self.agent.spawn(0, 0, 2.5, view=self.view)
         self.view.addItem(self.agent.mesh_item)
-        
-
-        # Add detection radius to Home
-        circle = create_circle(radius=20,x=0,y=0,z=0, color=(0.1, 0.7, 1.0, 0.5))
-        self.view.addItem(circle)
 
         # Place the sun high above the world for visibility
         sun_items = create_sun(x=200, y=200, z=200, radius=10, ray_length=40)
@@ -353,30 +353,6 @@ class MainWindow(QtWidgets.QWidget):
         for item in sun_items:
             self.view.addItem(item)
 
-
-        # --- Spawn dead bug food ---
-        MIN_RADIUS = 200   # forbidden zone radius
-        MAX_RADIUS = 400  # how far bugs can spawn
-        for i in range(15):
-            fx, fy = random_point_outside_radius(MIN_RADIUS, MAX_RADIUS)
-            
-            food = Food_Model("CAD_Model_ant/fly_model.stl", scale=8)
-
-            # apply rotation to orient correctly
-            food.mesh_item.rotate(-90, 1, 0, 0)  
-
-            food.spawn(fx, fy, 1) #Z=1,spawn above x,y plane
-            circle_dead_bug=create_circle(radius=10,x=fx,y=fy,z=0,color=(0,0.5,1,0.8)) #radius = detection radius
-            
-
-            self.view.addItem(food.mesh_item)
-            self.view.addItem(circle_dead_bug)
-            self.objects[f"food_{i}"] = food
-
-
-        # Add the true trail to the scene (only true trail rendered)
-        self.view.addItem(self.trails.true_trail)
-        self.view.addItem(self.trails.sim_trail)
 
 
     def _animate_step(self):
@@ -425,14 +401,44 @@ class MainWindow(QtWidgets.QWidget):
         pass
     
     def start_search(self):
+
+        # Disable all UI controls once simulation starts
+        for w in [
+            self.bias_mean_input,
+            self.bias_std_input,
+            self.drift_std_input,
+            self.speed_slider,
+            self.turn_slider,
+            self.home_thresh_input,
+            self.n_food_input,
+            self.food_det_input,
+            self.home_det_input,
+            self.spawn_min_input,
+            self.spawn_max_input
+        ]:
+            w.setEnabled(False)
+
+            
         if not self.validate_parameters():
             QtWidgets.QMessageBox.warning(
                 self, "Invalid Parameters", "Fix parameters before starting simulation."
             )
             return
-        # Reset ant & trails if coming from STOP
+        
+        
+        self.apply_parameters()
+        self.rebuild_environment()
+
+        print("n_food_items cfg:", self.environment.cfg.n_food_items)
+        print("food_items stored:", len(self.environment.food_items))
+        print("renderables:", len(self.environment.get_renderables()))
+
+
+
         self.agent.spawn(0, 0, 2.5, view=self.view)
         self.trails.reset()
+        self.view.addItem(self.trails.true_trail)
+        self.view.addItem(self.trails.sim_trail)
         self.fsm.set_state(AgentState.SEARCH)
         self.pause_button.setText("Pause")
         self.start_button.setEnabled(False)
@@ -454,10 +460,27 @@ class MainWindow(QtWidgets.QWidget):
         if self.fsm.state != AgentState.STOP:
             self.fsm.set_state(AgentState.STOP)
             #self.export_simulation_data()
+            self.environment.clear()
             # Disable buttons
             self.stop_button.setEnabled(False)
             self.pause_button.setEnabled(False)
             self.start_button.setEnabled(True)
+
+            # Re-enable all UI parameter controls
+        for w in [
+            self.bias_mean_input,
+            self.bias_std_input,
+            self.drift_std_input,
+            self.speed_slider,
+            self.turn_slider,
+            self.home_thresh_input,
+            self.n_food_input,
+            self.food_det_input,
+            self.home_det_input,
+            self.spawn_min_input,
+            self.spawn_max_input
+        ]:
+            w.setEnabled(True)
 
 
     def validate_parameters(self):
@@ -471,13 +494,54 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def apply_parameters(self):
+        # Agent
         self.agent.bias_mean = self.bias_mean_input.value()
         self.agent.bias_std = self.bias_std_input.value()
         self.agent.drift_std = self.drift_std_input.value()
 
+        # Navigation speed / CRW / homing
         speed = self.speed_slider.value()
         self.search_policy.step_length = speed
         self.homing_policy.step_length = speed
-
         self.search_policy.turn_std = np.deg2rad(self.turn_slider.value())
         self.homing_policy.home_threshold = self.home_thresh_input.value()
+
+        # Environment
+        self.env_cfg.n_food_items = self.n_food_input.value()
+        self.env_cfg.food_detection_radius = self.food_det_input.value()
+        self.env_cfg.home_detection_radius = self.home_det_input.value()
+        self.env_cfg.food_spawn_min_radius = self.spawn_min_input.value()
+        self.env_cfg.food_spawn_max_radius = self.spawn_max_input.value()
+
+
+    def rebuild_environment(self):
+        # Remove old home circle
+        if self.home_circle_item is not None:
+            self.view.removeItem(self.home_circle_item)
+            self.home_circle_item = None
+
+        # Remove old food meshes
+        for m in self.food_mesh_items:
+            self.view.removeItem(m)
+        self.food_mesh_items.clear()
+
+        # Remove old food circles
+        for c in self.food_circle_items:
+            self.view.removeItem(c)
+        self.food_circle_items.clear()
+
+        # Build new environment
+        self.environment.reset()
+        self.environment.build()
+
+        # Add new home circle
+        self.home_circle_item = self.environment.home_circle
+        self.view.addItem(self.home_circle_item)
+
+        # Add new food meshes and circles
+        for food_mesh, food_circle in self.environment.food_items:
+            self.view.addItem(food_mesh)
+            self.view.addItem(food_circle)
+            self.food_mesh_items.append(food_mesh)
+            self.food_circle_items.append(food_circle)
+
