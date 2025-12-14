@@ -23,7 +23,12 @@ class MainWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Bio-Inspired Robotics")
-        self.setGeometry(100, 100, 1200, 800)
+        screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        self.resize(
+            min(1200, screen.width()),
+            min(800, screen.height())
+        )
+
 
         # --Load Configs--
         self.agent_cfg = AgentConfig()
@@ -34,6 +39,11 @@ class MainWindow(QtWidgets.QWidget):
         self.home_circle_item = None
         self.food_mesh_items = []
         self.food_circle_items = []
+
+
+        # --- State Flags ---
+        self.results_logged = False
+        self.step_count = 0  # Needed for the Sun Compass timer later
 
 
 
@@ -62,7 +72,8 @@ class MainWindow(QtWidgets.QWidget):
         self.fsm = FSMController(
             agent=self.agent,
             search_policy=self.search_policy,
-            homing_policy=self.homing_policy
+            homing_policy=self.homing_policy,
+            logger=self.log,
         )
 
 
@@ -75,7 +86,7 @@ class MainWindow(QtWidgets.QWidget):
         self.instruction_layout = QtWidgets.QVBoxLayout()
         self.instruction_widget.setLayout(self.instruction_layout)
         self.outer_splitter.addWidget(self.instruction_widget)
-        self.instruction_widget.setMinimumWidth(180)
+        self.instruction_widget.setMinimumWidth(150)
 
         # Instructions
         self.instructions_text = QtWidgets.QTextEdit()
@@ -94,6 +105,52 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.instructions_text.setMaximumHeight(200)
         self.instruction_layout.addWidget(self.instructions_text)
+
+        # --- 1. EXPERIMENT SELECTOR (The Research Switch) ---
+        self.exp_group = QtWidgets.QGroupBox("Experiment Mode")
+        self.exp_layout = QtWidgets.QVBoxLayout()
+        self.exp_group.setLayout(self.exp_layout)
+        
+        self.mode_selector = QtWidgets.QComboBox()
+        self.mode_selector.addItems([
+            "1. Blind (Est Pos) - EXPECT DRIFT", 
+            "2. Control (True Pos) - CHEAT", 
+            "3. Sun Compass (Corrected) - SOLUTION"
+        ])
+        self.exp_layout.addWidget(self.mode_selector)
+        self.instruction_layout.addWidget(self.exp_group)
+
+        # --- 2. DYNAMIC LOG CONSOLE (Replacing static instructions) ---
+        self.log_group = QtWidgets.QGroupBox("Simulation Log")
+        self.log_layout = QtWidgets.QVBoxLayout()
+        self.log_group.setLayout(self.log_layout)
+
+        self.console = QtWidgets.QTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setStyleSheet("background-color: #222; color: #0f0; font-family: Monospace; font-size: 10pt;")
+        self.console.setPlainText("--- SYSTEM READY ---\n")
+        self.log_layout.addWidget(self.console)
+        
+        self.instruction_layout.addWidget(self.log_group)
+
+
+        # ============================
+        # SCROLLABLE PARAMETERS BOX
+        # ============================
+        self.param_scroll = QtWidgets.QScrollArea()
+        self.param_scroll.setWidgetResizable(True)
+        self.param_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.param_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.param_scroll.setFixedHeight(360)  # <-- THIS is the key
+
+        param_container = QtWidgets.QWidget()
+        param_layout = QtWidgets.QVBoxLayout(param_container)
+        param_layout.setContentsMargins(6, 6, 6, 6)
+        param_layout.setSpacing(10)
+
+        # ---------- Agent Parameters ----------
+        agent_group = QtWidgets.QGroupBox("Agent Parameters")
+        agent_form = QtWidgets.QFormLayout(agent_group)
 
         # --- Agent Parameters ---
         self.param_group = QtWidgets.QGroupBox("Agent Parameters")
@@ -152,10 +209,9 @@ class MainWindow(QtWidgets.QWidget):
         self.param_layout.addRow("", self.turn_label)
         self.param_layout.addRow("Home threshold", self.home_thresh_input)
 
-        self.instruction_layout.addWidget(self.param_group)
 
         # --- Environment Parameters ---
-        self.env_group = QtWidgets.QGroupBox("Environment")
+        self.env_group = QtWidgets.QGroupBox("Environment Parameters")
         env_layout = QtWidgets.QFormLayout()
         self.env_group.setLayout(env_layout)
 
@@ -185,8 +241,6 @@ class MainWindow(QtWidgets.QWidget):
         env_layout.addRow("Spawn min r", self.spawn_min_input)
         env_layout.addRow("Spawn max r", self.spawn_max_input)
 
-        self.instruction_layout.addWidget(self.env_group)
-
         # --- Control Buttons ---
         self.start_button = QtWidgets.QPushButton("Start Search")
         self.pause_button = QtWidgets.QPushButton("Pause Search")
@@ -194,6 +248,17 @@ class MainWindow(QtWidgets.QWidget):
         self.instruction_layout.addWidget(self.start_button)
         self.instruction_layout.addWidget(self.pause_button)
         self.instruction_layout.addWidget(self.stop_button)
+
+        param_layout.addWidget(self.param_group)
+        param_layout.addWidget(self.env_group)
+        param_layout.addStretch(1)
+
+        # Attach container to scroll area
+        self.param_scroll.setWidget(param_container)
+
+        # Add scroll area to sidebar
+        self.instruction_layout.addWidget(self.param_scroll)
+
 
         # Connect buttons
         self.start_button.clicked.connect(self.start_search)
@@ -207,7 +272,6 @@ class MainWindow(QtWidgets.QWidget):
 
         self.instruction_layout.addStretch(1)
 
-        self.outer_splitter.addWidget(self.instruction_widget)
         self.instruction_widget.setMinimumWidth(150)
 
 
@@ -257,6 +321,8 @@ class MainWindow(QtWidgets.QWidget):
         layout = QtWidgets.QHBoxLayout()
         layout.addWidget(self.outer_splitter)
         self.setLayout(layout)
+
+        self.setMinimumSize(800, 600)
 
         # --- Timer for live updates ---
         self.setup_scene()
@@ -365,6 +431,46 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def _animate_step(self):
+
+        dt = 0.1 # Simulation timestep
+        
+        # --- 1. RUN AGENT LOGIC (Movement) ---
+        # The FSM calculates the move and updates the agent's position
+        self.fsm.update()
+
+        # --- 2. CHECK WORLD EVENTS (Collisions) ---
+        
+        # Scenario A: Collision with FOOD (Only relevant if searching)
+        if self.fsm.state == AgentState.SEARCH:
+            # Check collision using True Physics Position
+            found, items_to_remove = self.environment.check_food_collision(self.agent.get_true_pos())
+            
+            if found:
+                # 1. Remove graphics
+                for item in items_to_remove:
+                    self.view.removeItem(item)
+                
+                # 2. Force State Change
+                self.fsm.set_state(AgentState.RETURN)
+
+        # Scenario B: Collision with HOME (Only relevant if Returning)
+        # We check the result ONLY when the agent decides to stop.
+        if self.fsm.state == AgentState.STOP:
+            
+            # Now we look at Truth
+            true_pos = self.agent.get_true_pos()[:2]
+            dist_error = np.linalg.norm(true_pos) # Dist from (0,0)
+            
+            # Check if it was a Success or a Miss
+            if dist_error < self.env_cfg.home_detection_radius:
+                #This happens if drift was low, or it got lucky
+                print(f"SUCCESS: Arrived! Error: {dist_error:.2f}mm")
+                pass 
+            else:
+                # This is the expected "Blind Navigation" outcome
+                print(f"FAILED: Missed Nest by {dist_error:.2f}mm")
+                pass
+        
         # Update XY plot
         if len(self.trails.true_trail_data) > 0:
             self.true_curve.setData(
@@ -388,8 +494,31 @@ class MainWindow(QtWidgets.QWidget):
         if not self.simulation_active:
             return
         else:
-            #1
-            self.fsm.update()
+            self.step_count += 1
+            # 1. Check Experiment Mode
+            mode_index = self.mode_selector.currentIndex()
+            #2
+                # --- MODE 2: SUN COMPASS LOGIC ---
+            # If in "Sun Compass" mode, simulate intermittent scanning
+            if mode_index == 2:
+                # Every 2 seconds (approx 60 frames), fix the heading
+                # (We use a simple frame counter or timer here)
+                if self.step_count % 60 == 0: 
+                    # You need to implement 'correct_heading()' in Agent
+                    # self.agent.scan_sun() 
+                    self.log("Sun Scan: Heading Corrected.")
+
+            # --- Run FSM Update ---
+            # Special Case for Mode 1 (Cheat):
+            if mode_index == 1 and self.fsm.state == AgentState.RETURN:
+                # Feed TRUE position to homing policy temporarily
+                true_pos = self.agent.get_true_pos()[:2]
+                dx, dy, done = self.fsm.homing_policy.step(true_pos)
+                self.agent.move(dx, dy)
+                if done: self.fsm.set_state(AgentState.STOP)
+            else:
+                # Normal FSM (Uses Sim Position)
+                self.fsm.update()
             
             # 2. Only log trails if agent moved
         if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
@@ -404,6 +533,22 @@ class MainWindow(QtWidgets.QWidget):
             # Update Camera Position to follow the ant
             px, py, pz = self.agent.position
             self.view.follow(px, py, pz)
+
+        if self.fsm.state == AgentState.STOP and not self.results_logged:
+            true_pos = self.agent.get_true_pos()[:2]
+            dist_error = np.linalg.norm(true_pos)
+            
+            radius = self.env_cfg.home_detection_radius
+            
+            if dist_error < radius:
+                self.log(f"SUCCESS: Home reached! (Err: {dist_error:.1f}mm)")
+            else:
+                self.log(f"FAILED: Missed Nest by {dist_error:.1f}mm")
+            
+            self.results_logged = True # Prevent spamming log every frame
+            self.cleanup_experiment()
+
+
 
 
     def update_transforms(self):
@@ -435,9 +580,15 @@ class MainWindow(QtWidgets.QWidget):
             )
             return
         
-        
+        self.simulation_active = True
+        self.log("Simulation Started.")
+        # Reset flags
+        self.results_logged = False
+        self.step_count = 0
         self.apply_parameters()
         self.rebuild_environment()
+
+        
 
         self.agent.spawn(0, 0, 2.5, view=self.view)
         self.trails.reset() 
@@ -446,44 +597,35 @@ class MainWindow(QtWidgets.QWidget):
         self.start_button.setEnabled(False)
         self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
-        self.simulation_active = True
 
     def toggle_pause(self):
-        if self.fsm.state == AgentState.SEARCH:
-            # Currently searching → pause
+        # If we are running (Search or Return), we PAUSE
+        if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
+            self.previous_state = self.fsm.state # Remember what we were doing
             self.fsm.set_state(AgentState.IDLE)
-            self.pause_button.setText("Resume Search")
+            self.pause_button.setText("Resume")
+            self.log("Simulation Paused.")
+            
+        # If we are IDLE (Paused), we RESUME
         elif self.fsm.state == AgentState.IDLE:
-            # Currently paused → resume
-            self.fsm.set_state(AgentState.SEARCH)
-            self.pause_button.setText("Pause Search")
+            if hasattr(self, 'previous_state'):
+                self.fsm.set_state(self.previous_state)
+            else:
+                # Fallback if state was lost
+                self.fsm.set_state(AgentState.SEARCH) 
+                
+            self.pause_button.setText("Pause")
+            self.log("Simulation Resumed.")
 
     def stop_search(self):
+        """Manually stops the simulation."""
         if self.fsm.state != AgentState.STOP:
             self.fsm.set_state(AgentState.STOP)
-            #self.export_simulation_data()
-            self.environment.clear()
-            # Disable buttons
-            self.stop_button.setEnabled(False)
-            self.pause_button.setEnabled(False)
-            self.start_button.setEnabled(True)
-
-            # Re-enable all UI parameter controls
-        for w in [
-            self.bias_mean_input,
-            self.bias_std_input,
-            self.stride_noise_input,
-            self.heading_noise_input,
-            self.speed_slider,
-            self.turn_slider,
-            self.home_thresh_input,
-            self.n_food_input,
-            self.food_det_input,
-            self.home_det_input,
-            self.spawn_min_input,
-            self.spawn_max_input
-        ]:
-            w.setEnabled(True)
+            self.log("Simulation stopped by user.")
+            
+            self.timer.stop()
+            # Use the same cleanup logic
+            self.cleanup_experiment()
 
 
     def validate_parameters(self):
@@ -521,33 +663,85 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def rebuild_environment(self):
-        # Remove old home circle
+        # 1. Clear existing items from the View
         if self.home_circle_item is not None:
             self.view.removeItem(self.home_circle_item)
             self.home_circle_item = None
 
-        # Remove old food meshes
+        # Remove Food Meshes (SAFE VERSION)
         for m in self.food_mesh_items:
-            self.view.removeItem(m)
+            try:
+                self.view.removeItem(m)
+            except ValueError:
+                pass # Item was already removed (eaten) during the sim
         self.food_mesh_items.clear()
 
-        # Remove old food circles
+        # Remove Food Circles (SAFE VERSION)
         for c in self.food_circle_items:
-            self.view.removeItem(c)
+            try:
+                self.view.removeItem(c)
+            except ValueError:
+                pass # Item was already removed (eaten) during the sim
         self.food_circle_items.clear()
 
-        # Build new environment
+        # 2. Reset and Rebuild the Logic/Physics world
         self.environment.reset()
         self.environment.build()
 
-        # Add new home circle
+        # 3. Add Home Circle
         self.home_circle_item = self.environment.home_circle
-        self.view.addItem(self.home_circle_item)
+        if self.home_circle_item:
+            self.view.addItem(self.home_circle_item)
 
-        # Add new food meshes and circles
-        for food_mesh, food_circle in self.environment.food_items:
+        # 4. Add Food Meshes (Handling the Dictionary structure)
+        # --- UPDATED LOOP ---
+        for item_data in self.environment.food_items:
+            # Extract meshes from the dictionary
+            food_mesh = item_data['food_mesh']
+            food_circle = item_data['circle_mesh']
+            
+            # Add to 3D View
             self.view.addItem(food_mesh)
             self.view.addItem(food_circle)
+            
+            # Track them so we can delete them later
             self.food_mesh_items.append(food_mesh)
             self.food_circle_items.append(food_circle)
 
+    def log(self, message):
+        """Prints message to the sidebar console with a timestamp."""
+        # Simple timestamp or step count
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.console.append(f"[{timestamp}] {message}")
+        
+        # Auto-scroll to bottom
+        scrollbar = self.console.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+
+    def cleanup_experiment(self):
+        """
+        Called when simulation ends (Naturally OR via Stop button).
+        Re-enables settings and resets internal flags.
+        """
+        self.simulation_active = False
+        
+        # 1. Re-enable all parameter controls
+        for w in [
+            self.bias_mean_input, self.bias_std_input, self.stride_noise_input,
+            self.heading_noise_input, self.speed_slider, self.turn_slider,
+            self.home_thresh_input, self.n_food_input, self.food_det_input,
+            self.home_det_input, self.spawn_min_input, self.spawn_max_input,
+            self.mode_selector # Don't forget the mode selector!
+        ]:
+            w.setEnabled(True)
+
+        # 2. Reset Button States
+        self.start_button.setEnabled(True)
+        self.pause_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.pause_button.setText("Pause Search") # Reset text if it was paused
+
+        # 3. Log
+        self.log("Simulation ended. Parameters unlocked.")

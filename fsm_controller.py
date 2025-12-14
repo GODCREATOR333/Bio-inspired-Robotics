@@ -9,7 +9,7 @@ class AgentState(Enum):
 
 
 class FSMController:
-    def __init__(self, agent,search_policy,homing_policy):
+    def __init__(self, agent,search_policy,homing_policy,logger=None):
         """
         agent: Agent_Model instance
         navigation_policy: e.g. CorrelatedRandomWalk
@@ -18,12 +18,22 @@ class FSMController:
         self.search_policy = search_policy
         self.homing_policy = homing_policy
         self.nav = None
+        self.logger = logger
         self.state = AgentState.IDLE
 
+
+    def log(self, message):
+        """Helper to send logs to the UI if available, else print to terminal."""
+        if self.logger:
+            self.logger(message)  # Call the UI function
+        else:
+            print(f"[FSM] {message}")  # Fallback for debugging
 
     def set_state(self, new_state):
         if new_state == self.state:
             return
+
+        self.log(f"FSM Switching: {self.state.name} -> {new_state.name}")
 
         self.state = new_state
 
@@ -49,17 +59,13 @@ class FSMController:
             dx, dy = self.search_policy.step()
             self.agent.move(dx, dy)
 
-            # food detection will go here later
-
-        elif self.state == AgentState.FOUND_FOOD:
-            self.set_state(AgentState.RETURN)
-
         elif self.state == AgentState.RETURN:
-            pos = self.agent.get_sim_pos()[:2]
-            dx, dy, done = self.homing_policy.step(pos)
+            sim_pos = self.agent.get_sim_pos()[:2]
+            dx, dy, arrived = self.homing_policy.step(sim_pos)
             self.agent.move(dx, dy)
 
-            if done:
+            if arrived:
+                self.log("Agent believes it is home.")
                 self.set_state(AgentState.STOP)
 
         elif self.state == AgentState.STOP:
