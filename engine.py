@@ -104,11 +104,12 @@ class MainWindow(QtWidgets.QWidget):
             "   [R]              : RESET Simulation & View\n\n"
 
             "=== VISUAL LEGEND ===\n"
-            "   Cyan Line    : Ground Truth Path (Physics)\n"
-            "   Purple Line  : Estimated Path (Odometry)\n"
+            "   Yellow Line    : Ground Truth Path\n"
+            "   Purple Line  : Estimated Path (Odometry error)\n"
             "   Yellow Dots  : Sun Compass Correction Events\n"
             "   Blue Circles : Food Detection Range\n"
-            "   Red Circle   : Home Detection Range\n\n"
+            "   Red Circle   : Ant Detection Range\n"
+            "   Brown Circle   : Home Detection Range\n\n"
 
             "=== EXPERIMENT MODES ===\n"
             "1. Blind Navigation (Est Pos):\n"
@@ -122,10 +123,20 @@ class MainWindow(QtWidgets.QWidget):
             "   - EXPECTATION: Heading drift is bounded; Home is reached.\n\n"
 
             "=== PARAMETER GUIDE ===\n"
-            "   - Bias Mean/Std : Systematic turning error (The 'Curled' Path).\n"
-            "   - Heading Noise : Random angular jitter (The 'Wobbly' Path).\n"
-            "   - Stride Noise  : Distance estimation error (The 'Overshoot').\n"
-            "   - Scan Interval : Distance (mm) between Sun corrections.\n"
+            "Heading Bias Mean : Systematic compass offset (curved path)\n"
+            "Heading Bias Std  : Run-to-run bias variability\n"
+            "Heading Noise     : Random angular jitter (wobble)\n"
+            "Stride Noise      : Distance estimation error\n"
+            "Speed             : Forward step length per update\n"
+            "Turn Std          : Random turn variability (CRW strength)\n"
+            "Scan Interval     : Distance (mm) between sun compass corrections\n\n"
+
+            "=== HOMING / ENVIRONMENT ===\n"
+            "Home Threshold    : Distance to nest for successful homing\n"
+            "Food Detect R     : Radius to detect food items\n"
+            "Home Detect R     : Radius to detect nest\n"
+            "Spawn Min R       : Minimum food spawn distance\n"
+            "Spawn Max R       : Maximum food spawn distance\n\n"
         )
 
         sidebar_layout.addWidget(self.instructions)
@@ -310,12 +321,19 @@ class MainWindow(QtWidgets.QWidget):
 
         self.xy_plot = pg.PlotWidget()
         self.xy_plot.showGrid(x=True, y=True)
-        self.true_curve = self.xy_plot.plot(pen=pg.mkPen((0, 180, 180), width=2))
+        self.xy_plot.setLabel('left', 'Y Position (mm)')
+        self.xy_plot.setLabel('bottom', 'X Position (mm)')
+        self.xy_plot.setTitle("Ant Trajectory (Top View)")
+        self.xy_plot.setAspectLocked(True)  # geometry correctness
+        self.true_curve = self.xy_plot.plot(pen=pg.mkPen((153, 102, 0, 204), width=2))
         self.sim_curve = self.xy_plot.plot(pen=pg.mkPen((180, 0, 180), width=2))
         bottom_splitter.addWidget(self.xy_plot)
 
         self.error_plot = pg.PlotWidget()
         self.error_plot.showGrid(x=True, y=True)
+        self.error_plot.setLabel('left', 'Position Error (mm)')
+        self.error_plot.setLabel('bottom', 'Step')
+        self.error_plot.setTitle("Path Integration Error")
         self.error_curve = self.error_plot.plot(pen=pg.mkPen((200, 50, 50), width=2))
         bottom_splitter.addWidget(self.error_plot)
 

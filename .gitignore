@@ -2,3 +2,27 @@
 .vscode
 .git
 __pycache__
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# OS junk
+.DS_Store
+Thumbs.db
