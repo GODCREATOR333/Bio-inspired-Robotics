@@ -17,7 +17,7 @@ Inspired by the desert ant *Cataglyphis*, this framework models how **intermitte
 
 **Modular, decoupled design** with strict separation of physics, perception, and control:
 
-- **Independent modules:** Physics engine, sensor models, and agent logic operate separately
+- **Independent modules:** Physics engine, environment modules, and agent logic operate separately
 - **RL-ready:** Exposed state-action interfaces for reinforcement learning integration
 - **Highly customizable:** Swap navigation policies without modifying core simulation
 - **Extensible:** Add new behaviors as plug-and-play components
@@ -76,10 +76,5 @@ This work was developed as part of the selection task for the **FedEx SMART Proj
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
-
-
-
+This project is licensed under the MIT License.
 
