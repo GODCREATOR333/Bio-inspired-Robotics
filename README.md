@@ -38,6 +38,7 @@ python main.py
 ```
 
 ## 📊 Results Summary
+Table 1: Results summary across three navigation modes (N = 10 trials per mode).
 
 | Mode | Strategy | Success Rate | Terminal Error |
 |------|----------|:------------:|:--------------:|
