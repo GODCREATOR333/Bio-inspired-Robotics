@@ -45,8 +45,6 @@ python main.py
 | Control | Ground Truth | 100% | 2.96 mm |
 | Sun Compass | PI + Scan (100mm) | **90%** | **9.72 mm** |
 
-**Key insight:** Intermittent global corrections reduce drift by ~90% without infrastructure.
-
 
 ### Controls
 *   **Experiment Selection:** Use the dropdown in the sidebar to switch between `Blind`, `Control`, and `Sun Compass` modes.
