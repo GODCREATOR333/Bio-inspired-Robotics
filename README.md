@@ -13,6 +13,14 @@ Inspired by the desert ant *Cataglyphis*, this framework models how **intermitte
 *   **For Robotics:** It demonstrates how to navigate without expensive infrastructure (QR code grids) or heavy computation (Visual SLAM).
 *   **For Research:** It serves as a lightweight, stochastic environment for training **Reinforcement Learning (RL)** agents to optimize the trade-off between energy (stopping to scan) and accuracy (localization).
 
+## 🏗️ Architecture
+
+**Modular, decoupled design** with strict separation of physics, perception, and control:
+
+- **Independent modules:** Physics engine, sensor models, and agent logic operate separately
+- **RL-ready:** Exposed state-action interfaces for reinforcement learning integration
+- **Highly customizable:** Swap navigation policies without modifying core simulation
+- **Extensible:** Add new behaviors as plug-and-play components
 
 ![Simulation Interface](Report/images/demo2.png)
 
