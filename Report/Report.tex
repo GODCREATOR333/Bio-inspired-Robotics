@@ -110,11 +110,11 @@ The agent operates through five states: IDLE $\to$ SEARCH $\to$ FOUND\_FOOD $\to
 % ===== RESULTS =====
 \section*{3. Experimental Validation}
 
-\textbf{Mode 1—Blind (Estimated):} Pure odometry spiraled catastrophically. \textit{Critical:} When heading error exceeded $\pi/2$ (90°), control became unstable—the internal map inverted, causing the agent to walk \textit{away} while believing it approached home.
+\textbf{Mode 1—Blind (Estimated):} The agent relied only on odometry and spiraled off course. When heading error exceeded 90°, its internal map inverted, causing it to move away from the home location.
 
-\textbf{Mode 2—Control (True):} Ground truth confirmed perfect homing with error-free odometry.
+\textbf{Mode 2—Control (True):} Using true position, the agent consistently returned home without error.
 
-\textbf{Mode 3—Sun Compass:} Periodic scans created ``sawtooth'' errors—drift reset before reaching $\pi/2$. Error reduced by 90\%, achieving 100\% success rate.
+\textbf{Mode 3—Sun Compass:} Periodic heading corrections limited drift. Terminal error was reduced by 81\%, and the agent successfully reached home in 90\% of trials.
 
 \begin{table}[H]
     \centering
@@ -132,7 +132,7 @@ The agent operates through five states: IDLE $\to$ SEARCH $\to$ FOUND\_FOOD $\to
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.65\textwidth]{images/demo2.png}
-    \caption{Simulation interface showing parameter controls (left), 3D trajectory (top center), and true vs. estimated position with error metrics (bottom).}
+    \caption{Simulation interface showing parameter controls (left), 3D View (top center), true vs. estimated position and error vs steps(bottom).}
     \label{fig:ui}
 \end{figure}
 
@@ -142,6 +142,6 @@ Mode 2 (Control—true): \href{https://youtu.be/sY_AZQPQl3A}{Watch} \quad | \qua
 Mode 3 (Sun compass): \href{https://youtu.be/nh_rpq5Yy5c}{Watch}
 
 \section*{4. Discussion: Architecture \& Scalability}
-I designed a \textbf{modular, decoupled architecture} where the physics engine, mathematical models, and agent logic operate independently. This strict separation ensures high customizability and establishes an \textbf{RL-ready environment}; the exposed state-action interfaces allow seamless integration with reinforcement learning algorithms to train optimized navigation policies, directly supporting future research into autonomous warehouse logistics.
+I designed a \textbf{modular, decoupled architecture} where the physics engine, mathematical models, and agent logic operate independently. This strict separation ensures high customizability and establishes an \textbf{RL-ready environment}; the exposed state-action interfaces allow seamless integration with reinforcement learning algorithms to train optimized navigation policies supporting future research into autonomous warehouse logistics.
 
 \end{document}
