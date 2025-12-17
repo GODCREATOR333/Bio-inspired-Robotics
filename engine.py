@@ -44,7 +44,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # --- State Flags ---
         self.results_logged = False
-        self.step_count = 0  # Needed for the Sun Compass timer later
+        self.step_count = 0 
 
 
 
@@ -54,7 +54,7 @@ class MainWindow(QtWidgets.QWidget):
         self.objects = {}
 
 
-        # Has Simulation started ?
+        # Check Simulation status
         self.simulation_active = False
 
 
@@ -360,14 +360,13 @@ class MainWindow(QtWidgets.QWidget):
     def setup_scene(self):
         """Creates a 2D canvas on the XY plane."""
 
-        # --- 1. Single XY Plane Grid ---
+        # Single XY Plane Grid ---
         grid = gl.GLGridItem()
         grid.setSize(x=1500, y=1500)
         grid.setSpacing(x=10, y=10)
         # No rotation -> stays in XY plane
         self.view.addItem(grid)
 
-        # --- 2. Axes (in XY plane) ---
         axis_len = 200
 
         # X axis
@@ -380,23 +379,23 @@ class MainWindow(QtWidgets.QWidget):
             [0, 0, 0], [0, axis_len, 0], (0, 1, 0, 1)
         ))
 
-        # -X axis (red, lighter shade optional)
+        # -X axis 
         self.view.addItem(geometry.axis_line(
             [0, 0, 0], [-axis_len, 0, 0], (1, 0.4, 0.4, 1)
         ))
 
-        # -Y axis (green, lighter shade optional)
+        # -Y axis 
         self.view.addItem(geometry.axis_line(
             [0, 0, 0], [0, -axis_len, 0], (0.4, 1, 0.4, 1)
         ))
 
 
-        # Optional Z axis
+        # Z axis
         self.view.addItem(geometry.axis_line(
             [0, 0, 0], [0, 0, 50], (0, 0, 1, 1)
         ))
 
-        # --- 3. Labels ---
+        # Labels ---
         x_label = GLTextItem(
             pos=[axis_len + 5, 0, 0],
             text="X",
@@ -435,7 +434,7 @@ class MainWindow(QtWidgets.QWidget):
 
 
 
-        # --- 4. Camera (top-down 2D view) ---
+        # Camera (top-down 2D view) ---
         self.view.setCameraPosition(distance=300, elevation=90, azimuth=0)
         self.view.opts['center'] = QtGui.QVector3D(0, 0, 0)
 
@@ -457,9 +456,7 @@ class MainWindow(QtWidgets.QWidget):
     def _animate_step(self):
         dt = 0.1 
 
-        # --- REMOVED: self.fsm.update() (It moved to simulation_step) ---
-
-        # --- 1. COLLISION WITH FOOD (Search Mode) ---
+        #COLLISION WITH FOOD (Search Mode) ---
         if self.fsm.state == AgentState.SEARCH:
             # (No changes here, logic was fine)
             found, items_to_remove = self.environment.check_food_collision(self.agent.get_true_pos())
@@ -468,18 +465,14 @@ class MainWindow(QtWidgets.QWidget):
                     self.view.removeItem(item)
                 self.fsm.set_state(AgentState.RETURN)
 
-        # --- 2. COLLISION WITH HOME (The Judge) ---
+        # COLLISION WITH HOME 
         if self.fsm.state == AgentState.STOP:
             # Judge using TRUE positions
             true_pos = self.agent.get_true_pos()[:2]
             dist_center_to_center = np.linalg.norm(true_pos)
-            
-            # --- CHANGED: FAIR CHECK (Ant Radius + Home Radius) ---
-            # Get ant radius (default to 10.0 if missing)
             ant_r = getattr(self.agent, 'ant_radius', 10.0) 
             home_r = self.env_cfg.home_detection_radius
             
-            # The Edge-to-Edge threshold
             combined_threshold = ant_r + home_r
             
             if dist_center_to_center < combined_threshold:
@@ -488,7 +481,7 @@ class MainWindow(QtWidgets.QWidget):
                 gap = dist_center_to_center - combined_threshold
                 print(f"FAILED: Missed by {gap:.2f}mm")
 
-        # --- 3. PLOTS (No changes) ---
+        # PLOTS 
         if len(self.trails.true_trail_data) > 0:
             self.true_curve.setData(self.trails.true_trail_data[:, 0], self.trails.true_trail_data[:, 1])
             self.sim_curve.setData(self.trails.sim_trail_data[:, 0], self.trails.sim_trail_data[:, 1])
@@ -506,7 +499,7 @@ class MainWindow(QtWidgets.QWidget):
         self.step_count += 1
         mode_index = self.mode_selector.currentIndex()
 
-        # --- LOGIC BLOCK 1: SUN COMPASS (Mode 2) ---
+        # --- LOGIC BLOCK: SUN COMPASS ---
         if mode_index == 2:
             if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
                 SCAN_THRESHOLD_MM = self.agent.scan_threshold 
@@ -520,7 +513,7 @@ class MainWindow(QtWidgets.QWidget):
                     self.view.addItem(scan_circle)
                     self.scan_markers.append(scan_circle)
 
-        # --- LOGIC BLOCK 2: MOVEMENT ---
+        # --- LOGIC BLOCK MOVEMENT ---
         # Case: Cheat Mode (Mode 1) AND Returning
         if mode_index == 1 and self.fsm.state == AgentState.RETURN:
             # Drive using True Position
@@ -529,12 +522,12 @@ class MainWindow(QtWidgets.QWidget):
             self.agent.move(dx, dy)
             if done: self.fsm.set_state(AgentState.STOP)
             
-        # Case: Standard FSM (Mode 0 & Mode 2)
+        # Case: Standard FSM 
         else:
             # Drive using Est Position
             self.fsm.update()
 
-        # --- LOGIC BLOCK 3: UPDATE VISUALS ---
+        # --- LOGIC BLOCK : UPDATE VISUALS ---
         if self.fsm.state in [AgentState.SEARCH, AgentState.RETURN]:
             self.trails.update(self.agent.get_true_pos(), self.agent.get_sim_pos())
             
@@ -545,7 +538,7 @@ class MainWindow(QtWidgets.QWidget):
             px, py, pz = self.agent.position
             self.view.follow(px, py, pz)
 
-        # --- LOGIC BLOCK 4: END GAME LOGGING (Updated Logic) ---
+        # --- LOGIC BLOCK : END GAME LOGGING ---
         if self.fsm.state == AgentState.STOP and not self.results_logged:
             true_pos = self.agent.get_true_pos()[:2]
             dist_error = np.linalg.norm(true_pos)
@@ -639,7 +632,6 @@ class MainWindow(QtWidgets.QWidget):
             self.fsm.set_state(AgentState.STOP)
             self.log("Simulation stopped by user.")
             
-            # Use the same cleanup logic
             self.cleanup_experiment()
 
 
@@ -656,7 +648,8 @@ class MainWindow(QtWidgets.QWidget):
 
 
     def apply_parameters(self):
-        # Agent
+
+        # Agent parameters
         self.agent.heading_bias_mean = self.bias_mean_input.value()
         self.agent.heading_bias_std = self.bias_std_input.value()
         self.agent.heading_noise_std = self.heading_noise_input.value()

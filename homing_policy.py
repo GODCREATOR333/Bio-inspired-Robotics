@@ -1,4 +1,3 @@
-# homing_policy.py
 import numpy as np
 
 
@@ -11,16 +10,14 @@ class VectorHoming:
         pass
 
     def step(self, pos):
-        """
-        pos : perceived position (x, y)
-        """
         v = -pos
         dist = np.linalg.norm(v)
-
-        # FIX: Stop if we are within threshold OR if one step would overshoot
-        # This prevents the "Orbiting" bug.
         if dist < self.home_threshold or dist < self.step_length:
             return 0.0, 0.0, True
+        
+         # Safety catch for "Runaway" agents
+        if dist > 10000: # 10 meters
+             return 0.0, 0.0, True # Force Stop (Give Up)
 
         direction = v / dist
         dx, dy = self.step_length * direction

@@ -1,4 +1,3 @@
-# correlated_random_walk.py
 import numpy as np
 
 
@@ -21,22 +20,15 @@ class CorrelatedRandomWalk:
         self.heading = 0.0  # radians
 
 
+    # Reset internal CRW state.
     def reset(self, heading=None):
-        """
-        Reset internal CRW state.
-        """
         if heading is None:
             self.heading = self.rng.uniform(0, 2 * np.pi)
         else:
             self.heading = heading
 
-
+    # One CRW step.
     def step(self):
-        """
-        One CRW step.
-        Returns (dx, dy)
-        """
-        # correlated turn
         dtheta = self.rng.normal(0.0, self.turn_std)
         self.heading += dtheta
 

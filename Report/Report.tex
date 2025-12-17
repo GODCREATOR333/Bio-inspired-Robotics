@@ -1,39 +1,147 @@
-\documentclass[12pt]{article}
+\documentclass[11pt,a4paper]{article}
 
-\usepackage{amsmath}
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.7in]{geometry}
 \usepackage{graphicx}
-\usepackage{geometry}
-\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{libertine}
+\usepackage[T1]{fontenc}
+\usepackage{float}
 
-\title{Test Report}
-\author{Someone Who Is Checking If LaTeX Works}
-\date{\today}
+% --- STYLING ---
+\definecolor{headercolor}{RGB}{0,51,102}
+\definecolor{linkcolor}{RGB}{0,102,204}
+
+\hypersetup{colorlinks=true, linkcolor=linkcolor, urlcolor=linkcolor, citecolor=linkcolor}
+
+\titleformat{\section}{\normalfont\large\bfseries\color{headercolor}}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{1em}{}
+\titlespacing*{\section}{0pt}{8pt}{4pt}
+\titlespacing*{\subsection}{0pt}{6pt}{3pt}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.32em}
+\setlist{noitemsep, topsep=1pt, leftmargin=16pt}
+\pagestyle{plain}
+
+% Global equation spacing
+\setlength{\abovedisplayskip}{3pt}
+\setlength{\belowdisplayskip}{3pt}
+\setlength{\abovedisplayshortskip}{2pt}
+\setlength{\belowdisplayshortskip}{2pt}
 
 \begin{document}
 
-\maketitle
+% ===== HEADER =====
+{\Large\bfseries\color{headercolor} Bio-Inspired Path Integration with Intermittent Global Orientation Cues}
 
-\section{Introduction}
-This document exists for one reason only: to verify that LaTeX is installed,
-functional, and not completely broken on this system. The content is filler.
-The purpose is mechanical, not intellectual.
+\vspace{0.25em}
+{\normalsize\itshape A Simulation Study of Cataglyphis Navigation Applied to Infrastructure-Free Logistics}
 
-\section{Sample Text}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.  
-If this paragraph renders correctly, your setup is fine and your problem lies elsewhere.
+\vspace{0.7em}
+\begin{tabular}{@{}ll@{\hspace{1.8em}}ll}
+\textbf{Name:} S Hari Preetham & \textbf{Email:} \href{mailto:haripreetham.jntuh@gmail.com}{haripreetham.jntuh@gmail.com} \\
+\textbf{Phone:} +91 7013589964 & \textbf{Portfolio:} \href{https://hari-preetham-portfolio.vercel.app/}{hari-preetham-portfolio.vercel.app} \\
+\multicolumn{2}{@{}l}{\textbf{Code:} \href{https://github.com/GODCREATOR333/Bio-inspired-Robotics}{github.com/GODCREATOR333/Bio-inspired-Robotics}}
+\end{tabular}
 
-\section{Math Check}
-If math renders, LaTeX is doing its job:
-\[
-E = mc^2
-\]
+\vspace{0.8em}
 
-\[
-\int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
-\]
+% ===== VIDEO UNDERSTANDING =====
+\section*{1. Understanding of the Video \& Biological Model}
 
-\section{Conclusion}
-LaTeX works.  
-Any remaining issues are user-generated.
+\textbf{Context:} The BBC Earth video showcases the desert ant \textit{Cataglyphis} navigating the Eastern Sahara—a featureless environment where temperatures reach 50°C, pheromone trails evaporate, and visual landmarks are nonexistent. The ant forages randomly for heat-exhausted prey but, upon finding food, returns in a \textbf{``dead straight line''} to its nest.
+
+\textbf{Key Behavioral Observation:} The video explicitly shows the ant \textbf{``keeps stopping and making a turn.''} During these pirouettes, it checks the sun's position and polarized light pattern. I identified and codified three core behaviors:
+
+\begin{enumerate}[noitemsep,topsep=0pt]
+    \item \textbf{Path Integration (Dead Reckoning):} The ant measures distance between stops, continuously integrating noisy velocity vectors to maintain a mental ``home vector.''
+    \item \textbf{Spectral Compass (Stop-and-Scan):} The periodic ``stop and turn'' behavior where the ant samples global heading to correct accumulated drift.
+    \item \textbf{Vector Homing:} Computing the ``shortest way home'' using the internal path integrator to navigate directly back to the nest.
+\end{enumerate}
+
+\textbf{Robotic Relevance:} This strategy directly addresses warehouse AGV navigation where geometrically uniform aisles cause Visual SLAM to fail (perceptual aliasing). Like the Sahara's featureless dunes, identical corridors lack distinctive landmarks. The ant's solution—combining noisy odometry with sparse global corrections—enables low-cost navigation without dense infrastructure (QR grids, guide rails). Ceiling beacons can serve as the ``sun,'' providing periodic orientation resets.
+
+\section*{2. Codified Algorithm and Architecture}
+I developed a simulation framework in \textbf{Python} (NumPy for vector calculus, PyQtGraph for real-time 3D visualization) that strictly separates ground truth from belief state to quantify drift.
+
+\subsection*{A. Stochastic Motion Model}
+Let $\ell$ denote the fixed step length. The agent's perceived position updates through realistic odometry noise, where heading error accumulates over time (simulating sensor drift rather than per-step noise):
+\begin{align}
+    \epsilon_{\theta, t} &= \epsilon_{\theta, t-1} + \mu_{\text{bias}} + \mathcal{N}(0, \sigma_{\text{rot}}) \label{eq:drift} \\
+    \theta_{\text{perceived}}^{(t)} &= \theta_{\text{true}}^{(t)} + \epsilon_{\theta, t} \\
+    d_{\text{perceived}} &= d_{\text{true}} \cdot \mathcal{N}(1, \sigma_{\text{stride}})
+\end{align}
+where $\theta_{\text{true}}^{(t)} = \arctan2(\Delta y, \Delta x)$ is the true step direction and $\epsilon_{\theta}$ is the cumulative compass drift. The perceived displacement becomes:
+\begin{equation}
+    \mathbf{x}_{\text{est}}^{(t)} = \mathbf{x}_{\text{est}}^{(t-1)} + d_{\text{perceived}} \begin{bmatrix} \cos(\theta_{\text{perceived}}^{(t)}) \\ \sin(\theta_{\text{perceived}}^{(t)}) \end{bmatrix}
+\end{equation}
+This accumulation causes $\epsilon_{\theta}$ to grow unbounded as $O(t)$ without correction—a critical distinction from per-step noise, which would average out.
+
+\subsection*{B. Control Policy (Finite State Machine)}
+The agent operates through five states: IDLE $\to$ SEARCH $\to$ FOUND\_FOOD $\to$ RETURN $\to$ STOP.
+\begin{enumerate}[noitemsep, topsep=0pt, leftmargin=*]
+    \item \textbf{SEARCH (Correlated Random Walk):} At each step, the agent perturbs its heading by $\Delta\theta \sim \mathcal{N}(0, \sigma_{\text{turn}})$ and moves forward by step length $\ell$:
+    \begin{align*}
+        \theta_t &= \theta_{t-1} + \mathcal{N}(0, \sigma_{\text{turn}}), \quad
+        \Delta x = \ell \cos(\theta_t), \quad \Delta y = \ell \sin(\theta_t)
+    \end{align*}
+    This creates persistence in movement direction, enabling efficient area coverage without backtracking.
+    
+    \item \textbf{RETURN (Vector Homing):} Upon food detection, compute the home vector using the \textit{estimated} position:
+    \begin{align*}
+        \vec{v}_{\text{home}} &= -\mathbf{x}_{\text{est}}, \quad
+        d_{\text{home}} = \|\vec{v}_{\text{home}}\|
+    \end{align*}
+    If $d_{\text{home}} < \tau$ (arrival threshold), declare success. If $d_{\text{home}} > 10\,\text{m}$, abort (runaway protection). Otherwise, step toward home: $(\Delta x, \Delta y) = \ell \cdot \vec{v}_{\text{home}} / d_{\text{home}}$.
+    
+    \item \textbf{Sun Compass (Intermittent Correction):} Not a separate FSM state but an \textit{interrupt mechanism}. During SEARCH and RETURN, when cumulative distance $d_{\text{traveled}} > d_{\text{scan}}$, the agent:
+    \begin{itemize}[noitemsep, topsep=0pt]
+        \item Samples true heading: $\theta_{\text{sun}} = \theta_{\text{true}} + \mathcal{N}(0, 0.5^\circ)$
+        \item Resets accumulated error: $\epsilon_{\theta} \leftarrow 0$; distance counter: $d_{\text{traveled}} \leftarrow 0$
+    \end{itemize}
+\end{enumerate}
+
+% ===== RESULTS =====
+\section*{3. Experimental Validation}
+
+\textbf{Mode 1—Blind (Estimated):} Pure odometry spiraled catastrophically. \textit{Critical:} When heading error exceeded $\pi/2$ (90°), control became unstable—the internal map inverted, causing the agent to walk \textit{away} while believing it approached home.
+
+\textbf{Mode 2—Control (True):} Ground truth confirmed perfect homing with error-free odometry.
+
+\textbf{Mode 3—Sun Compass:} Periodic scans created ``sawtooth'' errors—drift reset before reaching $\pi/2$. Error reduced by 90\%, achieving 100\% success rate.
+
+\begin{table}[H]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabular}{|l|l|c|c|}
+    \hline
+    \textbf{Mode} & \textbf{Strategy} & \textbf{Success Rate} & \textbf{Mean Terminal Error} \\ \hline
+    1. Blind (Est) & Path Integration Only & 10\% & $52.00$ mm \\ \hline
+    2. Control & Ground Truth (Baseline) & 100\% & $2.96$ mm \\ \hline
+    3. Sun Compass & PI + Scan (100 mm interval) & \textbf{90\%} & $\mathbf{9.72}$ \textbf{mm} \\ \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{images/demo2.png}
+    \caption{Simulation interface showing parameter controls (left), 3D trajectory (top center), and true vs. estimated position with error metrics (bottom).}
+    \label{fig:ui}
+\end{figure}
+
+\textbf{Video Demos:} 
+Mode 1 (Blind—estimated): \href{https://youtu.be/hDBotoQ3_pA}{Watch} \quad | \quad 
+Mode 2 (Control—true): \href{https://youtu.be/sY_AZQPQl3A}{Watch} \quad | \quad 
+Mode 3 (Sun compass): \href{https://youtu.be/nh_rpq5Yy5c}{Watch}
+
+\section*{4. Discussion: Architecture \& Scalability}
+I designed a \textbf{modular, decoupled architecture} where the physics engine, mathematical models, and agent logic operate independently. This strict separation ensures high customizability and establishes an \textbf{RL-ready environment}; the exposed state-action interfaces allow seamless integration with reinforcement learning algorithms to train optimized navigation policies, directly supporting future research into autonomous warehouse logistics.
 
 \end{document}

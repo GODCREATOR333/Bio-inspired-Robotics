@@ -10,10 +10,6 @@ class AgentState(Enum):
 
 class FSMController:
     def __init__(self, agent,search_policy,homing_policy,logger=None):
-        """
-        agent: Agent_Model instance
-        navigation_policy: e.g. CorrelatedRandomWalk
-        """
         self.agent = agent
         self.search_policy = search_policy
         self.homing_policy = homing_policy
@@ -23,11 +19,10 @@ class FSMController:
 
 
     def log(self, message):
-        """Helper to send logs to the UI if available, else print to terminal."""
         if self.logger:
-            self.logger(message)  # Call the UI function
+            self.logger(message)  
         else:
-            print(f"[FSM] {message}")  # Fallback for debugging
+            print(f"[FSM] {message}")  
 
     def set_state(self, new_state):
         if new_state == self.state:

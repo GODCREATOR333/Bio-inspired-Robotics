@@ -1,9 +1,6 @@
-# create_cuboid, visual_frames (Drawing helpers)
-
 import numpy as np
 import pyqtgraph.opengl as gl
-from pyqtgraph.opengl import GLMeshItem, GLTextItem, GLLinePlotItem,MeshData
-from PIL import Image, ImageDraw, ImageFont
+
 
 # --- Math Helper: Draw Axis Lines ---
 def axis_line(start, end, color):  #Draw each co-ordiante axis line
@@ -50,10 +47,6 @@ def create_circle(radius=10, segments=64, x=0, y=0, z=0, color=(1,0,0,1)):
 
 
 def create_sun(x=0, y=0, z=100, radius=8, ray_length=20, color=(1, 1, 0, 1)):
-    """
-    Create a sun-like global reference: a sphere + radial rays.
-    """
-
     # --- Sphere (sun core) ---
     sphere = gl.GLMeshItem(
         meshdata=gl.MeshData.sphere(rows=16, cols=32, radius=radius),

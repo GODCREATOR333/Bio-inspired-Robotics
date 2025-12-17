@@ -4,21 +4,8 @@ import pyqtgraph.opengl as gl
 from geometry import create_circle
 
 
-# What is there in this file ?
-# This file is supposed to be only concerned with the tunable parameters to experiment with .
-# Noise parameters
-# Geometry
-# State/position of the agent/ant
-
-
-
 class Agent_Model:
     def __init__(self, stl_path,agent_cfg, scale=0.01):
-        """
-        :param stl_path: Path to STL file
-        :param scale: Scaling factor to shrink the model
-        """
-
         self.heading = 0.0        # true heading
         self.heading_est = 0.0    # perceived heading
         self.agent_speed = agent_cfg.agent_speed
@@ -29,24 +16,23 @@ class Agent_Model:
         self.distance_since_last_scan = 0.0
         self.scan_threshold = agent_cfg.scan_interval
 
-        # Store scale factor
         self.scale_factor = scale
 
         self.ant_detection_range: float = 10.0
         self.ant_detection_circle = None
 
-        # --- Load STL ---
+       
         self.raw_mesh = mesh.Mesh.from_file(stl_path)
 
-        # --- Center vertices around origin ---
+        
         self.vertices = np.array(self.raw_mesh.vectors.reshape(-1, 3), dtype=np.float32)
         center = self.vertices.mean(axis=0)
         self.vertices -= center  # center the mesh
 
-        # --- Faces ---
+        
         self.faces = np.arange(len(self.vertices)).reshape(-1, 3)
 
-        # --- Dynamic (true) state ---
+        
         self.position = np.array([0.0, 0.0, 0.0], dtype=float)  # true world position
         self.perceived_position = self.position.copy() #Perceived Position of the ant
         self.rotation = 0.0  # degrees
@@ -124,8 +110,6 @@ class Agent_Model:
         self.position[1] += dy
         self.mesh_item.translate(dx, dy, 0)
 
-
-        # True Steps
         step_angle = np.arctan2(dy, dx)
         step_dist = np.hypot(dx, dy)
 
@@ -169,40 +153,12 @@ class Agent_Model:
     
 
     def scan_sun(self):
-        """
-        Simulates the 'Stop and Scan' behavior.
-        The ant looks at the polarization pattern (Sun) and resets its
-        internal heading estimate to match the Truth (plus some sensor noise).
-        """
         from geometry import normalize_angle
-        
-        # 1. Get True Heading (The Absolute Reference)
-        # In a warehouse, this is the angle of ceiling lights.
-        true_heading = self.heading  # This is the physics truth
-
-        # RESET the distance counter
+        true_heading = self.heading 
         self.distance_since_last_scan = 0.0
-        
-        # 2. Add Sensor Noise
-        # Even the sun compass isn't perfect (e.g., 1 degree error)
-        # We use a small noise, distinct from the walking drift.
-        sun_sensor_noise = np.random.normal(0.0, np.deg2rad(0.))
-        
+        sun_sensor_noise = np.random.normal(0.0, np.deg2rad(0.5))
         measured_heading = true_heading + sun_sensor_noise
-        
-        # 3. RESET the internal estimate
-        # The ant overwrites its bad dead-reckoning with the fresh sun reading.
-        # We effectively delete the accumulated 'heading_est' error.
-        
-        # Current logic: perceived = true + error
-        # Therefore: error = perceived - true
-        # We want to force perceived to be close to true.
-        
-        # Re-align the estimated heading to the measured heading
         self.heading_est = measured_heading - true_heading 
-        
-        # Note: In your specific move() implementation, 'heading_est' *IS* the accumulated error.
-        # So setting it to 0.0 (plus sensor noise) snaps the ghost ant back to parallel.
         self.heading_est = sun_sensor_noise
     
 

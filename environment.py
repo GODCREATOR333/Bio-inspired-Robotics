@@ -24,9 +24,6 @@ class Food_Model:
     def spawn(self, x, y, z=0):
         self.mesh_item.translate(x, y, z)
 
-
-# environment.py
-
 class Environment:
     def __init__(self, env_cfg):
         self.cfg = env_cfg
@@ -65,7 +62,7 @@ class Environment:
                 color=(0, 0.5, 1, 0.8)
             )
 
-            # Store everything in a nice dictionary
+            # Store everything in a dictionary
             item_data = {
                 'x': x,
                 'y': y,
@@ -88,8 +85,7 @@ class Environment:
             agent_x, agent_y = agent_true_pos[0], agent_true_pos[1]
             
             # Combined threshold: Ant Body + Food Detection Zone
-            # Assuming Ant radius ~5mm (or 0) + Food Radius
-            collision_threshold = self.cfg.food_detection_radius + 20.0 # +20 for Ant size buffer
+            collision_threshold = self.cfg.food_detection_radius + 20.0
             
             for i, item in enumerate(self.food_items):
                 fx, fy = item['x'], item['y']

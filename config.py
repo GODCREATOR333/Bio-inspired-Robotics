@@ -1,10 +1,7 @@
-# config.py
+# Do no edit the config file. Use the UI.
+
 from dataclasses import dataclass
 import numpy as np
-
-
-
-# Do no edit the config file. Use the UI.
 
 @dataclass
 class AgentConfig:

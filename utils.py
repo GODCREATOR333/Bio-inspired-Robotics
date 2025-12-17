@@ -14,9 +14,6 @@ def random_point_outside_radius(min_radius, max_radius):
 
 
 class TrailManager:
-    """
-    Manages two trails: true trail (real ant position) and simulated trail (ant's perceived path)
-    """
     def __init__(self):
         # Start with empty data 
         self.true_trail_data = np.zeros((0, 3), dtype=float)
@@ -27,7 +24,7 @@ class TrailManager:
             pos=self.true_trail_data,
             color=(0.6, 0.4, 0, 0.8),   # darker brown
             size=4,                    # dot size
-            pxMode=True               # express size in pixels -> consistent size
+            pxMode=True             
         )
 
         self.sim_trail = GLScatterPlotItem(
