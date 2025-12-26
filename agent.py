@@ -2,6 +2,7 @@ import numpy as np
 from stl import mesh
 import pyqtgraph.opengl as gl
 from geometry import create_circle
+from Extended_kalman_filter import EKF
 
 
 class Agent_Model:
@@ -21,6 +22,12 @@ class Agent_Model:
         self.ant_detection_range: float = 10.0
         self.ant_detection_circle = None
 
+        # Estimator params
+        self.sun_sensor_std = agent_cfg.sun_sensor_std
+        self.ekf_q_scale = agent_cfg.ekf_q_scale
+
+        self.scale_factor = scale
+
        
         self.raw_mesh = mesh.Mesh.from_file(stl_path)
 
@@ -36,6 +43,15 @@ class Agent_Model:
         self.position = np.array([0.0, 0.0, 0.0], dtype=float)  # true world position
         self.perceived_position = self.position.copy() #Perceived Position of the ant
         self.rotation = 0.0  # degrees
+
+
+        # Init EKF State vector and P-Matrix
+        q0 = [0.0, 0.0, 0.0]
+        P0 = np.eye(3) * 1e-9  # High confidence but not 0 to keep math stable
+        Q = np.diag([self.stride_noise_std**2, self.heading_noise_std**2]) * self.ekf_q_scale
+        self.ekf = EKF(q0, P0, Q)   # Process noise Q matrix
+
+
 
         # --- Create GLMeshItem ---
         self.mesh_item = gl.GLMeshItem(
@@ -64,7 +80,8 @@ class Agent_Model:
         heading_bias_std=None,
         heading_noise_std=None,
         stride_noise_std=None,
-        resample_bias=False
+        resample_bias=False,
+
     ):
         if heading_bias_mean is not None:
             self.heading_bias_mean = heading_bias_mean
@@ -78,6 +95,15 @@ class Agent_Model:
         if resample_bias:
             self.resample_bias()
 
+        # REBUILD THE EKF Q-MATRIX
+        # This is where the 'Pessimism/Optimism' scale is applied
+        new_Q = np.diag([
+            self.stride_noise_std**2, 
+            self.heading_noise_std**2
+        ]) * self.ekf_q_scale
+        
+        self.ekf.Q = new_Q
+
     # Place it in the world
     def spawn(self, x=0, y=0, z=0, view=None):
         # Reset transforms and scale (keeps consistent size)
@@ -86,14 +112,24 @@ class Agent_Model:
 
         # Set true position and move mesh
         self.position[:] = (x, y, z)
-        self.mesh_item.translate(x, y, z)
-
         self.perceived_position = np.array([x, y, z], dtype=float)
+        self.mesh_item.translate(x, y, z)
+        self.px, self.py, self.pz = self.perceived_position
 
         # Odometry init
         self.heading = 0.0
-        self.heading_est = self.heading + self.heading_bias  # initial compass miscalibration
 
+        
+        # Reset EKF
+        self.ekf.q = np.array([x, y, 0.0]).reshape(3, 1)
+        self.ekf.P = np.eye(3) * 1e-9
+
+        self.perceived_position = np.array([x, y, z], dtype=float)
+        self.px, self.py, self.pz = self.perceived_position
+
+        self.heading_est = 0.0 
+        self.distance_since_last_scan = 0.0
+        
         if self.ant_detection_circle is not None:
             self.ant_detection_circle.resetTransform()
             self.ant_detection_circle.translate(x, y, 0)
@@ -105,37 +141,38 @@ class Agent_Model:
 
 
     def move(self, dx, dy):
-        # True Position
+        # --- 1. PHYSICAL REALITY (Ground Truth) ---
         self.position[0] += dx
         self.position[1] += dy
         self.mesh_item.translate(dx, dy, 0)
+        
+        # Update True heading logic
+        true_heading_new = np.arctan2(dy, dx)
+        d_theta_true = true_heading_new - self.heading
+        self.heading = true_heading_new
 
-        step_angle = np.arctan2(dy, dx)
-        step_dist = np.hypot(dx, dy)
-
+        # --- 2. THE SENSORY REPORT (Odometry) ---
+        dist_true = np.hypot(dx, dy)
+        stride_noise = np.random.normal(1.0, self.stride_noise_std)
         heading_noise = np.random.normal(0.0, self.heading_noise_std)
-        stride_scale = np.random.normal(1.0, self.stride_noise_std)
-
-        stride_scale = np.random.normal(1.0, self.stride_noise_std)
-        step_dist_est = step_dist * stride_scale
-
-        # Accumulate the error (History)
-        self.heading_est += self.heading_bias + heading_noise 
-
-        # Apply history to current step
-        perceived_heading = step_angle + self.heading_est
         
-        # Old Method 
-        #perceived_heading = step_angle + self.heading_bias + self.heading_est
+        dist_felt = dist_true * stride_noise
+        d_theta_felt = d_theta_true + self.heading_bias + heading_noise
 
-        #Count total steps 
-        self.distance_since_last_scan += step_dist
-        
-        self.perceived_position[0] += step_dist_est * np.cos(perceived_heading)
-        self.perceived_position[1] += step_dist_est * np.sin(perceived_heading)
-        self.perceived_position[2] = self.position[2]
+        # --- 3. THE EKF PREDICTION ---
+        self.ekf.predict(dist_felt, d_theta_felt)
+
+        # --- 4. UPDATE TRACKING VARIABLES ---
+        # We pull the Mean from the EKF and update px, py, pz 
+        # so the TrailManager sees the new belief.
+        self.perceived_position[0] = self.ekf.q[0, 0]
+        self.perceived_position[1] = self.ekf.q[1, 0]
+        self.perceived_position[2] = self.position[2] # z = 0
 
         self.px, self.py, self.pz = self.perceived_position
+        
+        # Distance tracker for the next sun scan
+        self.distance_since_last_scan += dist_true
 
         if self.ant_detection_circle is not None:
             self.ant_detection_circle.translate(dx, dy, 0)
@@ -153,13 +190,51 @@ class Agent_Model:
     
 
     def scan_sun(self):
-        from geometry import normalize_angle
+        # 1. THE SENSOR READING (Reality + Noise)
+        # The 'True' heading is what the sun is actually relative to.
         true_heading = self.heading 
-        self.distance_since_last_scan = 0.0
-        sun_sensor_noise = np.random.normal(0.0, np.deg2rad(0.5))
-        measured_heading = true_heading + sun_sensor_noise
-        self.heading_est = measured_heading - true_heading 
-        self.heading_est = sun_sensor_noise
-    
+        
+        # We define how accurate the ant's eyes are (The W matrix)
+        # Original code used 0.5 degrees. 
+        sun_noise = np.random.normal(0.0, self.sun_sensor_std)
+        
+        measured_heading = true_heading + sun_noise
 
+        # 2. THE EKF UPDATE (The Brain Fix)
+        # We tell the EKF brain the absolute measurement and our sensor trust (R)
+        self.ekf.update(measured_heading, self.sun_sensor_std**2)
+
+        # 3. SYNC TRACKING VARIABLES
+        # Because the EKF may have nudged the x and y during the heading fix,
+        # we update our perceived_position so the Homing Policy stays in sync.
+        self.perceived_position[0] = self.ekf.q[0, 0]
+        self.perceived_position[1] = self.ekf.q[1, 0]
+        self.px, self.py, self.pz = self.perceived_position
+
+        # Reset the travel counter so the FSM knows when to scan again
+        self.distance_since_last_scan = 0.0
+        
+
+
+    def print_agent_params(self):
+        print("=" * 50)
+        print("ANT PARAMETERS")
+        print("=" * 50)
+        print(f"heading:                    {self.heading}")
+        print(f"heading_est:                {self.heading_est}")
+        print(f"heading_bias_mean:          {self.heading_bias_mean}")
+        print(f"agent_speed:                {self.agent_speed}")
+        print(f"heading_bias_std:           {self.heading_bias_std}")
+        print(f"heading_noise_std:          {self.heading_noise_std}")
+        print(f"stride_noise_std:           {self.stride_noise_std}")
+        print(f"distance_since_last_scan:   {self.distance_since_last_scan}")
+        print(f"scan_threshold:             {self.scan_threshold}")
+        print(f"scale_factor:               {self.scale_factor}")
+        print(f"ant_detection_range:        {self.ant_detection_range}")
+        print("\nESTIMATOR PARAMETERS")
+        print("-" * 50)
+        print(f"sun_sensor_std:             {self.sun_sensor_std}")
+        print(f"ekf_q_scale:                {self.ekf_q_scale}")
+        print(f"scale_factor:               {self.scale_factor}")
+        print("=" * 50)
     

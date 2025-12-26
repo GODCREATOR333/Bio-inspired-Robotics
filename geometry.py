@@ -83,3 +83,47 @@ def create_sun(x=0, y=0, z=100, radius=8, ray_length=20, color=(1, 1, 0, 1)):
 def normalize_angle(angle):
     """Keeps angle between -pi and +pi"""
     return (angle + np.pi) % (2 * np.pi) - np.pi
+
+
+# Error Ellipse
+def create_ellipse_item(covariance, x=0, y=0, confidence=0.95, color=(0, 1, 0, 1)):
+    # 1. Get the 2x2 positional covariance
+    cov_2d = covariance[:2, :2]
+    
+    # 2. Calculate Eigenvalues and Eigenvectors
+    # Eigenvalues = length of axes, Eigenvectors = rotation of axes
+    vals, vecs = np.linalg.eig(cov_2d)
+    
+    # 3. Calculate scale based on confidence (Chi-square value)
+    # For 95% confidence in 2D, the scale factor is approx 2.447 * sqrt(eigenvalue)
+    # or s = 5.991 (from chi-square table)
+    s = 5.991 
+    
+    # Calculate radii
+    # We use abs() just in case of tiny numerical noise making a value negative
+    width = 2 * np.sqrt(s * np.abs(vals[0]))
+    height = 2 * np.sqrt(s * np.abs(vals[1]))
+    
+    # 4. Generate points for a unit circle
+    theta = np.linspace(0, 2 * np.pi, 40)
+    circle_pts = np.array([np.cos(theta), np.sin(theta), np.zeros_like(theta)])
+    
+    # 5. Transform circle to ellipse
+    # Scale -> Rotate -> Translate
+    # Rotation matrix from eigenvectors
+    R = np.eye(3)
+    R[:2, :2] = vecs
+    
+    # Scaling matrix
+    S = np.diag([np.sqrt(s * np.abs(vals[0])), np.sqrt(s * np.abs(vals[1])), 1.0])
+    
+    # Apply transformations: points = R @ S @ circle + [x, y, 0]
+    ellipse_pts = (vecs @ S[:2, :2]) @ circle_pts[:2, :]
+    ellipse_pts[0, :] += x
+    ellipse_pts[1, :] += y
+    
+    # Format for PyQtGraph (N, 3)
+    pts = np.column_stack([ellipse_pts[0, :], ellipse_pts[1, :], np.zeros(len(theta))])
+    
+    # Create the Line Item
+    return gl.GLLinePlotItem(pos=pts, color=color, width=2, antialias=True)

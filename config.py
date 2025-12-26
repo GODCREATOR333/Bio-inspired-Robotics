@@ -15,6 +15,12 @@ class AgentConfig:
 
     scan_interval: float = 100.0  # mm (Distance between Sun Scans)
 
+    # Measurement Noise (R)
+    sun_sensor_std: float = np.deg2rad(0.5)          
+    
+    # Model Tuning
+    ekf_q_scale: float = 1.0        
+
 @dataclass
 class CRWConfig:
     turn_std: float = np.deg2rad(15.0)

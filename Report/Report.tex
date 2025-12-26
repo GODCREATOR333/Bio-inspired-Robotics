@@ -61,7 +61,7 @@
 
 \begin{enumerate}[noitemsep,topsep=0pt]
     \item \textbf{Path Integration (Dead Reckoning):} The ant measures distance between stops, continuously integrating noisy velocity vectors to maintain a mental ``home vector.''
-    \item \textbf{Spectral Compass (Stop-and-Scan):} The periodic ``stop and turn'' behavior where the ant samples global heading to correct accumulated drift.
+    \item \textbf{Sun Compass (Global Orientation Cue):} The periodic ``stop and turn'' behavior where the ant samples global heading to correct accumulated drift.
     \item \textbf{Vector Homing:} Computing the ``shortest way home'' using the internal path integrator to navigate directly back to the nest.
 \end{enumerate}
 
@@ -108,9 +108,9 @@ The agent operates through five states: IDLE $\to$ SEARCH $\to$ FOUND\_FOOD $\to
 \end{enumerate}
 
 % ===== RESULTS =====
-\section*{3. Experimental Validation}
+\section*{3. Experimental Validation (Results averaged over $N=10$ independent trials per mode)}
 
-\textbf{Mode 1—Blind (Estimated):} The agent relied only on odometry and spiraled off course. When heading error exceeded 90°, its internal map inverted, causing it to move away from the home location.
+\textbf{Mode 1—Blind (Estimated):} The agent relied only on odometry and spiraled off course. When heading error exceeded 90°, the estimated home vector pointed in the wrong direction, causing the agent to move away from the home location.
 
 \textbf{Mode 2—Control (True):} Using true position, the agent consistently returned home without error.
 
@@ -123,11 +123,12 @@ The agent operates through five states: IDLE $\to$ SEARCH $\to$ FOUND\_FOOD $\to
     \begin{tabular}{|l|l|c|c|}
     \hline
     \textbf{Mode} & \textbf{Strategy} & \textbf{Success Rate} & \textbf{Mean Terminal Error} \\ \hline
-    1. Blind (Est) & Path Integration Only & 10\% & $52.00$ mm \\ \hline
-    2. Control & Ground Truth (Baseline) & 100\% & $2.96$ mm \\ \hline
-    3. Sun Compass & PI + Scan (100 mm interval) & \textbf{90\%} & $\mathbf{9.72}$ \textbf{mm} \\ \hline
+    1. Blind (Est) & Path Integration Only & 10\% & 52.00 mm \\ \hline
+    2. Control & Ground Truth (Baseline) & 100\% & 2.96 mm \\ \hline
+    3. Sun Compass & PI + Scan (100 mm interval) & \textbf{90\%} & \textbf{9.72 mm} \\ \hline
     \end{tabular}
 \end{table}
+
 
 \begin{figure}[H]
     \centering
@@ -142,6 +143,6 @@ Mode 2 (Control—true): \href{https://youtu.be/sY_AZQPQl3A}{Watch} \quad | \qua
 Mode 3 (Sun compass): \href{https://youtu.be/nh_rpq5Yy5c}{Watch}
 
 \section*{4. Discussion: Architecture \& Scalability}
-I designed a \textbf{modular, decoupled architecture} where the physics engine, mathematical models, and agent logic operate independently. This strict separation ensures high customizability and establishes an \textbf{RL-ready environment}; the exposed state-action interfaces allow seamless integration with reinforcement learning algorithms to train optimized navigation policies supporting future research into autonomous warehouse logistics.
+I designed a \textbf{modular, decoupled architecture} where the physics engine, mathematical models, and agent logic operate independently. This strict separation ensures high customizability and establishes an \textbf{RL-compatible simulation structure}; the exposed state-action interfaces allow seamless integration with reinforcement learning algorithms to train optimized navigation policies supporting future research into autonomous warehouse logistics.
 
 \end{document}

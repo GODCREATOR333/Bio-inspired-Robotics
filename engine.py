@@ -8,7 +8,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from viewer import MyView
 import geometry
 from agent import Agent_Model
-from geometry import create_circle,create_sun
+from geometry import create_circle,create_sun,create_ellipse_item
 from environment import Food_Model,Environment
 from utils import random_point_outside_radius,TrailManager
 from config import AgentConfig,CRWConfig,HomingConfig,EnvironmentConfig
@@ -127,7 +127,7 @@ class MainWindow(QtWidgets.QWidget):
             "Heading Bias Std  : Run-to-run bias variability\n"
             "Heading Noise     : Random angular jitter (wobble)\n"
             "Stride Noise      : Distance estimation error\n"
-            "Speed             : Forward step length per update\n"
+            "Agent Speed             : Forward step length per update\n"
             "Turn Std          : Random turn variability (CRW strength)\n"
             "Scan Interval     : Distance (mm) between sun compass corrections\n\n"
 
@@ -237,16 +237,39 @@ class MainWindow(QtWidgets.QWidget):
         self.home_thresh_input.setRange(1, 50)
         self.home_thresh_input.setValue(self.homing_cfg.home_threshold)
 
-        agent_form.addRow("Bias mean", self.bias_mean_input)
-        agent_form.addRow("Bias std", self.bias_std_input)
+        agent_form.addRow("Heading Bias mean", self.bias_mean_input)
+        agent_form.addRow("Heading Bias std", self.bias_std_input)
         agent_form.addRow("Heading noise", self.heading_noise_input)
         agent_form.addRow("Stride noise", self.stride_noise_input)
-        agent_form.addRow("Speed", speed_box)
+        agent_form.addRow("Agent Speed", speed_box)
         agent_form.addRow("Turn std", turn_box)
         agent_form.addRow("Scan interval", self.scan_interval_input)
         agent_form.addRow("Home threshold", self.home_thresh_input)
 
         param_layout.addWidget(agent_group)
+
+
+        # ---------- Estimator Parameters (EKF) ----------
+        est_group = QtWidgets.QGroupBox("Estimator Parameters (EKF)")
+        est_form = QtWidgets.QFormLayout(est_group)
+
+        # Sun Sensor Noise (Measurement Error R)
+        self.sun_std_input = QtWidgets.QDoubleSpinBox()
+        self.sun_std_input.setRange(0, 10)
+        self.sun_std_input.setSingleStep(0.1)
+        self.sun_std_input.setValue(np.rad2deg(self.agent_cfg.sun_sensor_std))
+        self.sun_std_input.setSuffix("°")
+
+        # EKF Q-Scale (Process Noise Multiplier)
+        self.ekf_q_scale_input = QtWidgets.QDoubleSpinBox()
+        self.ekf_q_scale_input.setRange(0.01, 10.0)
+        self.ekf_q_scale_input.setSingleStep(0.1)
+        self.ekf_q_scale_input.setValue(self.agent_cfg.ekf_q_scale)
+
+        est_form.addRow("Sun Sensor Std", self.sun_std_input)
+        est_form.addRow("EKF Trust Scale", self.ekf_q_scale_input)
+
+        param_layout.addWidget(est_group)
 
         # ---------- Environment Parameters ----------
         env_group = QtWidgets.QGroupBox("Environment Parameters")
@@ -450,6 +473,24 @@ class MainWindow(QtWidgets.QWidget):
 
         self.view.addItem(self.trails.true_trail)
         self.view.addItem(self.trails.sim_trail)
+        
+
+        # Create the 95% (Outer) Ellipse - Very faint
+        self.ellipse_95 = create_ellipse_item(self.agent.ekf.P, 0, 0, color=(0, 1, 0, 0.3))
+
+        # Create the 50% (Inner) Ellipse - More solid
+        self.ellipse_50 = create_ellipse_item(self.agent.ekf.P, 0, 0, color=(0, 1, 0, 0.7))
+
+        # Create a "Best Guess" marker (a small purple dot)
+        self.best_guess_marker = gl.GLScatterPlotItem(
+            pos=np.array([[0,0,1]]), 
+            color=(0.5, 0.3, 0.9, 1), 
+            size=5, pxMode=True
+        )
+
+        self.view.addItem(self.ellipse_95)
+        self.view.addItem(self.ellipse_50)
+        self.view.addItem(self.best_guess_marker)
 
 
 
@@ -480,6 +521,37 @@ class MainWindow(QtWidgets.QWidget):
             else:
                 gap = dist_center_to_center - combined_threshold
                 print(f"FAILED: Missed by {gap:.2f}mm")
+
+        # --- NEW: UPDATE ERROR ELLIPSE ---
+        if hasattr(self, 'ellipse_95'):
+            P = self.agent.ekf.P
+            px, py = self.agent.ekf.q[0, 0], self.agent.ekf.q[1, 0]
+            
+            # 1. Math for the shape
+            cov_2d = P[:2, :2]
+            vals, vecs = np.linalg.eig(cov_2d)
+            
+            # Standard Chi-square values for 2D:
+            s_95 = 5.991 
+            s_50 = 1.386 # 50% Confidence
+            
+            theta = np.linspace(0, 2 * np.pi, 50)
+            circle_pts = np.array([np.cos(theta), np.sin(theta)])
+
+            # 2. Update Outer (95%)
+            S_95 = np.diag([np.sqrt(s_95 * np.abs(vals[0])), np.sqrt(s_95 * np.abs(vals[1]))])
+            pts_95 = (vecs @ S_95) @ circle_pts
+            data_95 = np.column_stack([pts_95[0,:]+px, pts_95[1,:]+py, np.zeros(50)+1.0])
+            self.ellipse_95.setData(pos=data_95)
+
+            # 3. Update Inner (50%)
+            S_50 = np.diag([np.sqrt(s_50 * np.abs(vals[0])), np.sqrt(s_50 * np.abs(vals[1]))])
+            pts_50 = (vecs @ S_50) @ circle_pts
+            data_50 = np.column_stack([pts_50[0,:]+px, pts_50[1,:]+py, np.zeros(50)+1.1])
+            self.ellipse_50.setData(pos=data_50)
+
+            # 4. Update the Center Marker
+            self.best_guess_marker.setData(pos=np.array([[px, py, 1.2]]))
 
         # PLOTS 
         if len(self.trails.true_trail_data) > 0:
@@ -561,6 +633,40 @@ class MainWindow(QtWidgets.QWidget):
 
     def update_transforms(self):
         pass
+
+    def apply_parameters(self):
+
+        # Agent parameters
+        self.agent.heading_bias_mean = self.bias_mean_input.value()
+        self.agent.heading_bias_std = self.bias_std_input.value()
+        self.agent.heading_noise_std = self.heading_noise_input.value()
+        self.agent.stride_noise_std = self.stride_noise_input.value()
+        self.agent.scan_threshold = self.scan_interval_input.value()
+
+        # Navigation speed / CRW / homing
+        agent_speed = self.speed_slider.value()
+        self.agent.agent_speed = agent_speed
+        self.search_policy.step_length = agent_speed
+        self.homing_policy.step_length = agent_speed
+        self.search_policy.turn_std = np.deg2rad(self.turn_slider.value())
+        self.homing_policy.home_threshold = self.home_thresh_input.value()
+
+        # Environment
+        self.env_cfg.n_food_items = self.n_food_input.value()
+        self.env_cfg.food_detection_radius = self.food_det_input.value()
+        self.env_cfg.home_detection_radius = self.home_det_input.value()
+        self.env_cfg.food_spawn_min_radius = self.spawn_min_input.value()
+        self.env_cfg.food_spawn_max_radius = self.spawn_max_input.value()
+
+        # Update the NEW Estimator parameters in the config
+        self.agent.sun_sensor_std = np.deg2rad(self.sun_std_input.value())
+        self.agent.ekf_q_scale = self.ekf_q_scale_input.value()
+
+        self.agent.resample_bias() 
+        # Rebuild EKF Q matrix using new scale
+        self.agent.configure_noise()
+        
+
     
     def start_search(self):
 
@@ -578,7 +684,9 @@ class MainWindow(QtWidgets.QWidget):
             self.food_det_input,
             self.home_det_input,
             self.spawn_min_input,
-            self.spawn_max_input
+            self.spawn_max_input,
+            self.sun_std_input,
+            self.ekf_q_scale_input
         ]:
             w.setEnabled(False)
 
@@ -590,15 +698,15 @@ class MainWindow(QtWidgets.QWidget):
             return
         
         self.simulation_active = True
-        # Reset flags
-        self.results_logged = False
-        self.step_count = 0
         self.apply_parameters()
         self.rebuild_environment()
-
-        
-
+        # Reset flags
+        self.search_policy.reset(heading=0.0) 
         self.agent.spawn(0, 0, 2.5, view=self.view)
+        self.results_logged = False
+        self.step_count = 0
+
+        self.agent.print_agent_params()
         self.trails.reset() 
         self.fsm.set_state(AgentState.SEARCH)
         self.pause_button.setText("Pause")
@@ -647,29 +755,7 @@ class MainWindow(QtWidgets.QWidget):
         return True
 
 
-    def apply_parameters(self):
-
-        # Agent parameters
-        self.agent.heading_bias_mean = self.bias_mean_input.value()
-        self.agent.heading_bias_std = self.bias_std_input.value()
-        self.agent.heading_noise_std = self.heading_noise_input.value()
-        self.agent.stride_noise_std = self.stride_noise_input.value()
-        self.agent.scan_threshold = self.scan_interval_input.value()
-
-        # Navigation speed / CRW / homing
-        speed = self.speed_slider.value()
-        self.search_policy.step_length = speed
-        self.homing_policy.step_length = speed
-        self.search_policy.turn_std = np.deg2rad(self.turn_slider.value())
-        self.homing_policy.home_threshold = self.home_thresh_input.value()
-
-        # Environment
-        self.env_cfg.n_food_items = self.n_food_input.value()
-        self.env_cfg.food_detection_radius = self.food_det_input.value()
-        self.env_cfg.home_detection_radius = self.home_det_input.value()
-        self.env_cfg.food_spawn_min_radius = self.spawn_min_input.value()
-        self.env_cfg.food_spawn_max_radius = self.spawn_max_input.value()
-
+    
 
     def rebuild_environment(self):
 
@@ -750,7 +836,9 @@ class MainWindow(QtWidgets.QWidget):
             self.heading_noise_input, self.speed_slider,self.scan_interval_input, self.turn_slider,
             self.home_thresh_input, self.n_food_input, self.food_det_input,
             self.home_det_input, self.spawn_min_input, self.spawn_max_input,
-            self.mode_selector # Don't forget the mode selector!
+            self.mode_selector,
+            self.sun_std_input,
+            self.ekf_q_scale_input
         ]:
             w.setEnabled(True)
 

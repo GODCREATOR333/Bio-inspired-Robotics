@@ -28,4 +28,5 @@ if __name__ == '__main__':
     
     # Start the Event Loop
     print("Simulation Started successfully.")
+    
     sys.exit(app.exec_())
