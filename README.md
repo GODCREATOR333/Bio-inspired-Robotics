@@ -13,6 +13,14 @@ Inspired by the desert ant *Cataglyphis*, this framework models how **intermitte
 *   **For Robotics:** It demonstrates how to navigate without expensive infrastructure (QR code grids) or heavy computation (Visual SLAM).
 *   **For Research:** It serves as a lightweight, stochastic environment for training **Reinforcement Learning (RL)** agents to optimize the trade-off between energy (stopping to scan) and accuracy (localization).
 
+## 🏗️ Architecture
+
+**Modular, decoupled design** with strict separation of physics, perception, and control:
+
+- **Independent modules:** Physics engine, environment modules, and agent logic operate separately
+- **RL-ready:** Exposed state-action interfaces for reinforcement learning integration
+- **Highly customizable:** Swap navigation policies without modifying core simulation
+- **Extensible:** Add new behaviors as plug-and-play components
 
 ![Simulation Interface](Report/images/demo2.png)
 
@@ -38,14 +46,13 @@ python main.py
 ```
 
 ## 📊 Results Summary
+Table 1: Results summary across three navigation modes (N = 10 trials per mode).
 
 | Mode | Strategy | Success Rate | Terminal Error |
 |------|----------|:------------:|:--------------:|
 | Blind (Est) | Path Integration Only | 10% | 52.00 mm |
 | Control | Ground Truth | 100% | 2.96 mm |
 | Sun Compass | PI + Scan (100mm) | **90%** | **9.72 mm** |
-
-**Key insight:** Intermittent global corrections reduce drift by ~90% without infrastructure.
 
 
 ### Controls
@@ -69,10 +76,5 @@ This work was developed as part of the selection task for the **FedEx SMART Proj
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
-
-
-
+This project is licensed under the MIT License.
 
