@@ -19,7 +19,9 @@ By implementing a recursive **Extended Kalman Filter (EKF)** and a standardized 
 
 ## 🧠 Technical Core: The EKF Brain
 
-This Python (PyQtGraph + OpenGL) framework maintains a **Gaussian Belief State** $\mathcal{N}(\hat{q}, P)$ using a decoupled recursive estimator.
+This Python framework (PyQtGraph + OpenGL) maintains a **Gaussian belief state**
+\(\mathcal{N}(\hat{q}, P)\) using a **decoupled recursive estimator**.
+
 
 ### 1. Stochastic Prediction ($P = F_x P F_x^\top + G Q G^\top$)
 
@@ -64,8 +66,8 @@ The framework follows a strict **Decoupled Architecture** using dependency injec
 
 | Sun Compass Mode (Stable) | Blind Navigation (Diverging) |
 | :---: | :---: |
-| ![Small Ellipse](Report/images/demo.png) | ![Long Ellipse](Report/images/demo2.png) |
-| *Frequent updates bound the covariance growth.* | *Heading drift leads to "Cigar-shaped" uncertainty.* |
+| ![Small Ellipse](Report/images/demo.png) | ![Long Ellipse](Report/images/demo-long-ellipse.png.png) |
+| *Frequent updates bound the covariance growth resulting in small error ellipse* | *Heading drift leads to "Cigar-shaped" error ellipse.* |
 
 ---
 
