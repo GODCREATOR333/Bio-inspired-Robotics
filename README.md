@@ -21,7 +21,7 @@ By implementing a recursive **Extended Kalman Filter (EKF)** and a standardized 
 
 This Python framework (PyQtGraph + OpenGL) maintains a **Gaussian belief state**
 represented by a Gaussian distribution with mean **q̂** and covariance **P**,
-updated via a **decoupled recursive estimator**.
+updated via a **decoupled recursive extended kalman filter**.
 
 
 ### 1. Stochastic Prediction ($P = F_x P F_x^\top + G Q G^\top$)
