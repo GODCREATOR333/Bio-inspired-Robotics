@@ -122,9 +122,9 @@ The agent operates via five states: IDLE $\to$ SEARCH $\to$ FOUND\_FOOD $\to$ RE
 \end{figure}
 
 \textbf{Video Demos:} 
-Mode 1 (Blind—estimated): \href{https://youtu.be/hDBotoQ3_pA}{Watch} \quad | \quad 
-Mode 2 (Control—true): \href{https://youtu.be/sY_AZQPQl3A}{Watch} \quad | \quad 
-Mode 3 (Sun compass): \href{https://youtu.be/nh_rpq5Yy5c}{Watch}
+Mode 1 (Blind—estimated): \href{https://youtu.be/pHUvMSFNvnA}{Watch} |
+Mode 2 (Control—true): \href{https://youtu.be/J1Nd_F9FPd4}{Watch}  | 
+Mode 3 (Sun compass): \href{https://youtu.be/WiiOwJ9P_O8}{Watch} |
 
 \section*{4. Architecture and Research Scalability}
 The system follows a modular, decoupled architecture, isolating the physical simulation from the estimator logic. To facilitate further study, the framework is wrapped as a \textbf{Gymnasium environment}, providing a standardized RL testbed. By exposing the EKF belief state as the observation space and normalized steering as the action space, the simulation acts as an API-driven platform for autonomous navigation research. This allows researchers to seamlessly deploy custom RL algorithms to optimize active sensing policies and investigate uncertainty-aware control in feature-sparse industrial environments.

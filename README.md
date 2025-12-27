@@ -73,9 +73,9 @@ The framework follows a strict **Decoupled Architecture** using dependency injec
 
 | Mode | Description | Link |
 |------|-------------|------|
-| **Mode 1** | Blind Navigation (Estimated Position) | [Watch](https://youtu.be/hDBotoQ3_pA) |
-| **Mode 2** | Control Baseline (True Position) | [Watch](https://youtu.be/sY_AZQPQl3A) |
-| **Mode 3** | Path Integration + Sun Compass | [Watch](https://youtu.be/nh_rpq5Yy5c) |
+| **Mode 1** | Blind Navigation (Estimated Position) | [Watch](https://youtu.be/pHUvMSFNvnA) |
+| **Mode 2** | Control Baseline (True Position) | [Watch](https://youtu.be/J1Nd_F9FPd4) |
+| **Mode 3** | Path Integration + Sun Compass | [Watch](https://youtu.be/WiiOwJ9P_O8) |
 
 ---
 
