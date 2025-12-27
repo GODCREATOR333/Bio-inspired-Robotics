@@ -17,6 +17,7 @@ __pycache__
 *.nav
 *.snm
 *.vrb
+*.dvi
 
 # Temporary files
 *.tmp
