@@ -58,12 +58,41 @@ The framework follows a strict **Decoupled Architecture** using dependency injec
 
 ---
 
-## 📊 Visual Ledger
+## 📊 Visual Legend & Instructions
 
-- **Yellow Path:** Ground Truth ($q_{true}$) — The physical reality.
-- **Purple Path:** EKF Mean Belief ($\hat{q}$) — The ant's internal memory.
-- **Green Rings:** Dual-layer uncertainty ellipses (50% and 95% confidence).
-- **Yellow Dots:** EKF Measurement Update events (Sun Scans).
+### Visual Elements
+
+| Element | Representation |
+|---------|----------------|
+| **Yellow Line** | Ground Truth Path ($q_{true}$) — Physical reality |
+| **Purple Line** | Estimated Mean Path ($q_{est}$) — Odometry with error |
+| **Purple Dot** | Current EKF Mean Belief (Mean) |
+| **Green Rings** | Uncertainty Ellipses ($P$-Matrix): Inner (50% CI), Outer (95% CI) |
+| **Yellow Dots** | Allothetic Sun-Scan Correction Events (Measurement Updates) |
+| **Red/Blue/Brown** | Detection ranges for Ant, Food, and Home respectively |
+
+### Parameter Guide
+
+- **Heading Bias (Mean/Std):** Models systematic drift and run-to-run variability (Secret to the EKF).
+- **Heading/Stride Noise:** Stochastic jitter (Process Noise $Q$).
+- **Sun Sensor Std:** Measurement noise ($R$-Matrix). Controls Kalman Gain ($K$) and update "snap."
+- **EKF Trust Scale:** Multiplier for $Q$-Matrix. Higher values induce filter "pessimism" (faster $P$ growth).
+
+---
+
+## 🧪 Experiment Modes
+
+1. **Blind Navigation (Est Pos):**
+   - Relies purely on recursive EKF prediction (Dead-Reckoning).
+   - Expectation: Monotonic uncertainty growth and eventual divergence (slingshot effect).
+
+2. **Control Group (True Pos):**
+   - Uses "God Mode" (True Coordinates).
+   - Expectation: Zero-drift, perfect straight-line homing.
+
+3. **Sun Compass (Corrected):**
+   - Implements periodic EKF Measurement Updates ($h$) similar to cataglyphis ant *Stop and Turn* behaviour.
+   - Expectation: Bounded orientation error and covariance "pinch" during updates.
 
 | Sun Compass Mode (Stable) | Blind Navigation (Diverging) |
 | :---: | :---: |
@@ -118,44 +147,6 @@ python main_RL.py
 # Train PPO agent
 python train_ppo.py
 ```
-
----
-
-## 📊 Visual Legend & Instructions
-
-### Visual Elements
-
-| Element | Representation |
-|---------|----------------|
-| **Yellow Line** | Ground Truth Path ($q_{true}$) — Physical reality |
-| **Purple Line** | Estimated Mean Path ($q_{est}$) — Odometry with error |
-| **Purple Dot** | Current EKF Mean Belief (Mean) |
-| **Green Rings** | Uncertainty Ellipses ($P$-Matrix): Inner (50% CI), Outer (95% CI) |
-| **Yellow Dots** | Allothetic Sun-Scan Correction Events (Measurement Updates) |
-| **Red/Blue/Brown** | Detection ranges for Ant, Food, and Home respectively |
-
-### Parameter Guide
-
-- **Heading Bias (Mean/Std):** Models systematic drift and run-to-run variability (Secret to the EKF).
-- **Heading/Stride Noise:** Stochastic jitter (Process Noise $Q$).
-- **Sun Sensor Std:** Measurement noise ($R$-Matrix). Controls Kalman Gain ($K$) and update "snap."
-- **EKF Trust Scale:** Multiplier for $Q$-Matrix. Higher values induce filter "pessimism" (faster $P$ growth).
-
----
-
-## 🧪 Experiment Modes
-
-1. **Blind Navigation (Est Pos):**
-   - Relies purely on recursive EKF prediction (Dead-Reckoning).
-   - Expectation: Monotonic uncertainty growth and eventual divergence (slingshot effect).
-
-2. **Control Group (True Pos):**
-   - Uses "God Mode" (True Coordinates).
-   - Expectation: Zero-drift, perfect straight-line homing.
-
-3. **Sun Compass (Corrected):**
-   - Implements periodic EKF Measurement Updates ($h$) similar to cataglyphis ant *Stop and Turn* behaviour.
-   - Expectation: Bounded orientation error and covariance "pinch" during updates.
 
 ---
 
